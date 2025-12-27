@@ -1,0 +1,32 @@
+{
+	"name": "@market-slice/auto-ru",
+	"version": "1.0.0",
+	"main": "index.js",
+	"scripts": {
+		"test": "node --test"
+	},
+	"keywords": ["auto.ru", "market-slice"],
+	"author": "lavisotskaya <vysotskaya-liya@yandex.ru>",
+	"license": "ISC",
+	"description": "Инструменты для получения среза с Auto.Ru",
+	"type": "module",
+	"dependencies": {
+		"date-fns": "^3.6.0",
+		"lodash": "^4.17.21",
+		"xlsx": "^0.18.5"
+	},
+	"devDependencies": {
+		"promise-retry": "^2.0.1",
+		"puppeteer": "^22.13.1",
+		"puppeteer-core": "^22.13.1"
+	},
+	"peerDependencies": {
+		"puppeteer": "^22.13.1",
+		"puppeteer-core": "^22.13.1"
+	},
+	"peerDependenciesMeta": {
+		"puppeteer": {
+			"optional": true
+		}
+	}
+}

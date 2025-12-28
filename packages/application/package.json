@@ -4,7 +4,8 @@
 	"bin": "./index.js",
 	"exports": {
 		".": "./lib/index.js",
-		"./store": "./store.js"
+		"./store": "./store.js",
+		"./slices/*": "./slices/*"
 	},
 	"scripts": {
 		"start": "npx nodemon ./index.js",

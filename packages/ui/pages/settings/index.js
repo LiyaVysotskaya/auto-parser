@@ -13,6 +13,12 @@ import {
 	SelectOutlined,
 	UploadOutlined,
 } from "@ant-design/icons"
+import {
+	reset,
+	setSettings,
+	toggleBrand,
+	updateYears,
+} from "@market-slice/application/slices/settings.js"
 import * as store from "@market-slice/application/store"
 import {
 	Alert,
@@ -33,12 +39,6 @@ import {
 	message,
 } from "antd"
 
-import {
-	reset,
-	setSettings,
-	toggleBrand,
-	updateYears,
-} from "../../../application/slices/settings.js"
 import { electron } from "../../electron.js"
 
 const { Search } = Input

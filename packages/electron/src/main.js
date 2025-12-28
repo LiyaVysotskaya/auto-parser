@@ -162,6 +162,8 @@ const createWindow = () => {
 	})
 
 	mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY)
+	// Open the DevTools.
+	mainWindow.webContents.openDevTools()
 }
 
 app.whenReady().then(() => {

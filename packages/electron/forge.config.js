@@ -63,6 +63,8 @@ module.exports = {
 				mainConfig: "./webpack.main.config.js",
 				devContentSecurityPolicy:
 					"connect-src 'self' https://maximum.expert 'unsafe-eval'",
+				port: 9000,
+				loggerPort: 9001,
 				renderer: {
 					config: "./webpack.renderer.config.js",
 					entryPoints: [

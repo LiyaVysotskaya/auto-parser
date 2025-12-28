@@ -2,9 +2,9 @@ import React from "react"
 import { createRoot } from "react-dom/client"
 import { Provider as StoreProvider } from "react-redux"
 
+import { setSettings } from "@market-slice/application/slices/settings.js"
 import * as store from "@market-slice/application/store"
 
-import { setSettings } from "../application/slices/settings.js"
 import { App } from "./app.js"
 import { electron } from "./electron.js"
 

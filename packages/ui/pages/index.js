@@ -9,7 +9,6 @@ import _ from "lodash"
 
 import { Layout } from "../layout.js"
 import { AutoRu } from "./auto-ru/index.js"
-import { AutoRuReport } from "./auto-ru/report.js"
 import { Settings } from "./settings/index.js"
 
 export const pages = [
@@ -25,13 +24,6 @@ export const pages = [
 						element: <AutoRu />,
 						icon: <DashboardOutlined />,
 						label: "Главная",
-					},
-					{
-						path: "report",
-						element: <AutoRuReport />,
-						icon: <TableOutlined />,
-						label: "Отчет",
-						// disabled: true,
 					},
 					{
 						path: "settings",

@@ -1,47 +1,9 @@
 import "dotenv/config"
 
 import chromePaths from "chrome-paths"
-import fs from "fs"
-import path from "path"
-import { fileURLToPath } from "url"
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 function loadSettings() {
-	try {
-		const settingsPath = path.join(
-			__dirname,
-			"..",
-			"..",
-			"auto-ru-settings.json",
-		)
-		if (fs.existsSync(settingsPath)) {
-			const data = fs.readFileSync(settingsPath, "utf-8")
-			const settings = JSON.parse(data)
-
-			if (settings && Array.isArray(settings.brands)) {
-				const brands = settings.brands
-					.map((b) => {
-						if (typeof b === "string") return b
-						if (b && typeof b === "object")
-							return b.id ?? (b.name ? String(b.name).toLowerCase() : "")
-						return ""
-					})
-					.filter(Boolean)
-
-				return {
-					brands,
-					years: settings.years ?? { from: 2023, to: 2025 },
-				}
-			}
-		}
-	} catch (error) {
-		console.log(
-			"Не удалось загрузить настройки, используем по умолчанию:",
-			error.message,
-		)
-	}
-
+	// Всегда используем предустановленные настройки
 	return {
 		brands: [
 			"exeed",
@@ -77,20 +39,4 @@ const config = {
 
 export function getConfig() {
 	return config
-}
-
-export function saveSettings(newSettings) {
-	try {
-		const settingsPath = path.join(
-			__dirname,
-			"..",
-			"..",
-			"auto-ru-settings.json",
-		)
-		fs.writeFileSync(settingsPath, JSON.stringify(newSettings, null, 2))
-		return true
-	} catch (error) {
-		console.error("Ошибка сохранения настроек:", error)
-		return false
-	}
 }

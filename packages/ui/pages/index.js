@@ -8,7 +8,6 @@ import {
 import _ from "lodash"
 
 import { Layout } from "../layout.js"
-import { Authorization } from "./authorization.js"
 import { AutoRu } from "./auto-ru/index.js"
 import { AutoRuReport } from "./auto-ru/report.js"
 import { Settings } from "./settings/index.js"
@@ -44,16 +43,11 @@ export const pages = [
 			},
 		],
 	},
-	{
-		hidden: true,
-		path: "/login",
-		element: <Authorization />,
-	},
 ]
 
 export const defaultRoutes = ["/auto-ru", "/auto-ru/index"]
 
-export const initialEntries = ["/login"]
+export const initialEntries = defaultRoutes
 
 export function routes(current = pages) {
 	if (_.isArray(current)) return current.map((route) => routes(route))

@@ -1,5 +1,3 @@
-require("dotenv").config()
-const webpack = require("webpack")
 const rules = require("./webpack.rules")
 
 rules.push(
@@ -23,11 +21,4 @@ module.exports = {
 	module: {
 		rules,
 	},
-	plugins: [
-		new webpack.DefinePlugin({
-			"process.env.ELECTRON_RENDERER_AUTH_ENDPOINT": JSON.stringify(
-				process.env.ELECTRON_RENDERER_AUTH_ENDPOINT,
-			),
-		}),
-	],
 }

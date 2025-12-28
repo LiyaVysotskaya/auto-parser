@@ -71,9 +71,21 @@ const createWindow = () => {
 					if (projSettings.years) years = projSettings.years
 				} catch (err) {
 					console.warn(
-						"Нет проектного settings файла, используем минимальный набор брендов",
+						"Нет проектного settings файла, используем полный набор брендов",
 					)
-					brands = ["tenet"]
+					brands = [
+						"exeed",
+						"geely",
+						"haval",
+						"chery",
+						"omoda",
+						"jaecoo",
+						"belgee",
+						"jetour",
+						"aito",
+						"seres",
+						"tenet",
+					]
 				}
 			}
 
@@ -104,48 +116,6 @@ const createWindow = () => {
 				"Ошибка при обработке autoRu IPC:",
 				error && error.stack ? error.stack : error,
 			)
-		}
-	})
-
-	ipcMain.handle("get-settings", async () => {
-		try {
-			const settingsPath = path.join(
-				app.getPath("userData"),
-				"auto-ru-settings.json",
-			)
-			const data = await fs.readFile(settingsPath, "utf-8")
-			return JSON.parse(data)
-		} catch (error) {
-			return {
-				brands: [
-					{ id: "exeed", name: "Exeed", selected: true },
-					{ id: "geely", name: "Geely", selected: true },
-					{ id: "haval", name: "Haval", selected: true },
-					{ id: "chery", name: "Chery", selected: true },
-					{ id: "omoda", name: "Omoda", selected: true },
-					{ id: "jaecoo", name: "Jaecoo", selected: true },
-					{ id: "belgee", name: "Belgee", selected: false },
-					{ id: "jetour", name: "Jetour", selected: false },
-					{ id: "aito", name: "Aito", selected: false },
-					{ id: "seres", name: "Seres", selected: false },
-					{ id: "tenet", name: "Tenet", selected: false },
-				],
-				years: { from: 2023, to: 2025 },
-			}
-		}
-	})
-
-	ipcMain.handle("save-settings", async (event, settings) => {
-		try {
-			const settingsPath = path.join(
-				app.getPath("userData"),
-				"auto-ru-settings.json",
-			)
-			await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2))
-			return true
-		} catch (error) {
-			console.error("Error saving settings:", error)
-			return false
 		}
 	})
 

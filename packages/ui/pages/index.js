@@ -1,12 +1,17 @@
 import React from "react"
 
-import { DashboardOutlined, TableOutlined } from "@ant-design/icons"
+import {
+	DashboardOutlined,
+	SettingOutlined,
+	TableOutlined,
+} from "@ant-design/icons"
 import _ from "lodash"
 
 import { Layout } from "../layout.js"
 import { Authorization } from "./authorization.js"
 import { AutoRu } from "./auto-ru/index.js"
 import { AutoRuReport } from "./auto-ru/report.js"
+import { Settings } from "./settings/index.js"
 
 export const pages = [
 	{
@@ -27,6 +32,7 @@ export const pages = [
 						element: <AutoRuReport />,
 						icon: <TableOutlined />,
 						label: "Отчет",
+						// disabled: true,
 					},
 					{
 						path: "settings",

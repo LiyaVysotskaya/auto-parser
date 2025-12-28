@@ -7,12 +7,16 @@ import { program } from "commander"
 import * as dateFns from "date-fns"
 import figlet from "figlet"
 import _ from "lodash"
+import { fileURLToPath } from "url"
 
-import { config } from "./config.js"
-import { autoRu, store } from "./lib/index.js"
+import { getConfig } from "./config.js"
+import * as autoRu from "./lib/auto-ru.js"
+import { sagaMiddleware, instance as store } from "./store.js"
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const pkg = JSON.parse(
-	await fs.readFile(path.join(import.meta.dirname, "package.json"), "utf-8"),
+	await fs.readFile(path.join(__dirname, "package.json"), "utf-8"),
 )
 
 const header =
@@ -33,39 +37,37 @@ program.version(pkg.version)
 program
 	.command("auto-ru")
 	.option(
-		`-u, --url ${config().autoRu.url ? "[URL]" : "<URL>"}`,
+		`-u, --url ${getConfig().autoRu.url ? "[URL]" : "<URL>"}`,
 		"Адрес страницы листинга",
-		config().autoRu.url ?? undefined,
+		getConfig().autoRu.url ?? undefined,
 	)
 	.option(
-		`-b, --browserPath ${config().autoRu.browser.executablePath ? "[PATH]" : "<PATH>"}`,
+		`-b, --browserPath ${getConfig().autoRu.browser.executablePath ? "[PATH]" : "<PATH>"}`,
 		"Путь к исполняемому файлу Chrome",
-		config().autoRu.browser.executablePath ?? undefined,
+		getConfig().autoRu.browser.executablePath ?? undefined,
 	)
 	.action((options) => {
-		const c = config({
-			autoRu: {
-				...config().autoRu,
-				browser: { executablePath: options.browserPath },
-				url: options.url,
+		const config = getConfig()
+		const effectiveOptions = {
+			url: options.url || config.autoRu.url,
+			browser: {
+				executablePath:
+					options.browserPath || config.autoRu.browser.executablePath,
 			},
-		}).autoRu
-		autoRu.action({
-			url: c.url,
-			browser: c.browser,
-			brands: c.brands,
-			years: c.years,
-		})
-	}),
-	store.sagaMiddleware.run(autoRu.xlsxReportFsSaga)
+			brands: config.autoRu.brands,
+			years: config.autoRu.years,
+		}
+
+		autoRu.action(effectiveOptions)
+	})
 
 program.parse()
 
 render()
-store.instance.subscribe(_.throttle(render, 500))
+store.subscribe(_.throttle(render, 500))
 
 function render() {
-	const { log, ...state } = store.instance.getState()
+	const { log, ...state } = store.getState()
 	console.clear()
 	console.info(header)
 	;["autoRu"].forEach((scope) => {
@@ -126,6 +128,7 @@ function formatScope(scope) {
 	switch (scope) {
 		case "autoRu":
 			return [chalk.bgMagenta(chalk.white(" Auto.Ru "))]
+		default:
+			return [chalk.bgGray(chalk.white(` ${scope} `))]
 	}
-	return []
 }

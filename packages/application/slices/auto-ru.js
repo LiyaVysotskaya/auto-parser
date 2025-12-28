@@ -8,6 +8,13 @@ const initialState = {
 	status: null,
 	report: [],
 	pagination: null,
+	lastRun: {
+		startIso: null,
+		startMs: null,
+		endIso: null,
+		endMs: null,
+		durationMs: null,
+	},
 }
 
 export const slice = createSlice({
@@ -23,6 +30,9 @@ export const slice = createSlice({
 		},
 		report(state, action) {
 			state.report = action.payload
+		},
+		setLastRun(state, action) {
+			state.lastRun = { ...state.lastRun, ...action.payload }
 		},
 		reset() {
 			return _.cloneDeep(initialState)

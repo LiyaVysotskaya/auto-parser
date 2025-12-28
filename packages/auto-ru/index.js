@@ -184,6 +184,7 @@ export function* report() {
 
 	return result
 }
+
 export function xlsx(report) {
 	const workbook = XLSX.utils.book_new()
 	const headers = [

@@ -2,146 +2,204 @@ import React from "react"
 import { useSelector } from "react-redux"
 
 import { DownloadOutlined, PlayCircleOutlined } from "@ant-design/icons"
-import * as store from "@market-slice/application/store"
 import * as autoRuTools from "@market-slice/auto-ru"
 import {
 	Alert,
 	Button,
 	Card,
-	Flex,
-	Progress,
+	Col,
+	Divider,
+	Row,
 	Space,
 	Statistic,
 	Tag,
+	Typography,
 } from "antd"
 import * as dateFns from "date-fns"
 import * as XLSX from "xlsx"
 
 import { electron } from "../../electron.js"
 
+const { Text, Title } = Typography
+
+function formatDuration(ms) {
+	if (!ms && ms !== 0) return "—"
+	const s = Math.floor(ms / 1000)
+	const hh = Math.floor(s / 3600)
+	const mm = Math.floor((s % 3600) / 60)
+	const ss = s % 60
+	if (hh) return `${hh}h ${mm}m ${ss}s`
+	if (mm) return `${mm}m ${ss}s`
+	return `${ss}s`
+}
+
 export function AutoRu() {
-	const state = useSelector(() => store.instance.getState().autoRu)
-	const log = useSelector(() =>
-		store.instance.getState().log.filter(({ scope }) => scope === "autoRu"),
+	const autoRuState = useSelector((state) => state.autoRu)
+	const settings = useSelector((state) => state.settings)
+	const log = useSelector((state) =>
+		state.log.filter(({ scope }) => scope === "autoRu"),
 	)
-	const counters = {
-		pagination: {
-			current: state.pagination?.current ?? 0,
-			total: state.pagination?.total_page_count ?? 0,
-		},
-		offers: {
-			current: state.count ?? 0,
-			total: Math.min(
-				(state.pagination?.page_size ?? 0) *
-					(state.pagination?.total_page_count ?? 0),
-				state.pagination?.total_offers_count ?? 0,
-			),
-		},
+
+	const selectedBrands = (settings.brands || []).filter((b) => b.selected)
+	const selectedCount = selectedBrands.length
+	const totalBrands = (settings.brands || []).length
+	const years = settings.years || { from: "—", to: "—" }
+	const yearsText = `${years.from} — ${years.to}`
+
+	const report = autoRuState.report || []
+	const reportSheets = report.length
+	let reportRows = 0
+	for (const t of report) {
+		if (Array.isArray(t.rows)) reportRows += t.rows.length
 	}
 
+	const last = autoRuState.lastRun || {}
+	const lastStart = last.startIso
+		? dateFns.format(new Date(last.startIso), "dd.MM.yyyy HH:mm:ss")
+		: "—"
+	const lastDuration = formatDuration(last.durationMs)
+
 	return (
-		<>
-			<Space
-				direction="vertical"
-				style={{ width: "100%", marginTop: 16 }}
-				size="large"
+		<Space
+			direction="vertical"
+			style={{ width: "100%", marginTop: 16 }}
+			size="large"
+		>
+			<Row
+				justify="space-between"
+				align="middle"
+				style={{ width: "100%" }}
 			>
-				<Flex
-					gap={16}
-					justify="space-between"
-					align="start"
-				>
-					<Space wrap>
+				<Col>
+					<Title level={4}>Панель управления</Title>
+				</Col>
+				<Col>
+					<Space>
 						<Button
 							icon={<PlayCircleOutlined />}
-							disabled={state.status === "pending"}
-							onClick={() => {
-								electron?.autoRu()
-							}}
+							type="primary"
+							onClick={() => electron?.autoRu()}
+							disabled={autoRuState.status === "pending"}
 						>
 							Старт
 						</Button>
+
 						<Button
 							icon={<DownloadOutlined />}
-							disabled={state.status !== "success"}
 							onClick={() => {
 								XLSX.writeFile(
-									autoRuTools.xlsx(store.instance.getState().autoRu.report),
-									autoRuTools.reportName(
-										store.instance.getState().autoRu.report,
-										"xlsx",
-									),
+									autoRuTools.xlsx(autoRuState.report || []),
+									autoRuTools.reportName(autoRuState.report || [], "xlsx"),
 								)
 							}}
+							disabled={!autoRuState.report || !autoRuState.report.length}
 						>
-							Скачать отчет
+							Скачать отчёт
 						</Button>
 					</Space>
-					<Space wrap>
-						{state.status === "success" && <Tag color="green">Успех</Tag>}
-						{state.status === "pending" && <Tag color="blue">В процессе</Tag>}
-						{state.status === "failed" && <Tag color="red">Ошибка</Tag>}
-						{!state.status && <Tag>Ожидание</Tag>}
-					</Space>
-				</Flex>
-				<Flex gap={16}>
-					<Card title={"Страницы"}>
-						<Space
-							direction="vertical"
-							style={{ width: "100%" }}
+				</Col>
+			</Row>
+
+			<Row gutter={16}>
+				<Col
+					xs={24}
+					md={12}
+					lg={8}
+				>
+					<Card
+						title="Бренды для парсинга"
+						size="small"
+					>
+						<div>
+							<strong>Выбрано:</strong> {selectedCount} из {totalBrands}
+						</div>
+						<div
+							style={{
+								marginTop: 8,
+								display: "flex",
+								flexWrap: "wrap",
+								gap: 8,
+							}}
 						>
-							<Flex justify="center">
-								<Progress
-									type="dashboard"
-									percent={Math.floor(
-										(counters.pagination.current * 100) /
-											counters.pagination.total,
-									)}
-								/>
-							</Flex>
-							<Flex justify="center">
-								<Statistic
-									value={counters.pagination.current}
-									suffix={`/ ${counters.pagination.total.toLocaleString()}`}
-								/>
-							</Flex>
-						</Space>
+							{(settings.brands || []).map((b) => (
+								<Tag
+									key={b.id}
+									color={b.selected ? "blue" : "default"}
+								>
+									{b.name}
+								</Tag>
+							))}
+						</div>
 					</Card>
-					<Card title="Объявления">
-						<Space
-							direction="vertical"
-							style={{ width: "100%" }}
-						>
-							<Flex justify="center">
-								<Progress
-									type="dashboard"
-									percent={Math.floor(
-										(counters.offers.current * 100) / counters.offers.total,
-									)}
-								/>
-							</Flex>
-							<Flex justify="center">
-								<Statistic
-									value={counters.offers.current}
-									suffix={`/ ${counters.offers.total.toLocaleString()}`}
-								/>
-							</Flex>
-						</Space>
+				</Col>
+
+				<Col
+					xs={24}
+					md={12}
+					lg={8}
+				>
+					<Card
+						title="Диапазон годов"
+						size="small"
+					>
+						<Statistic
+							title="Годы"
+							value={yearsText}
+						/>
 					</Card>
-				</Flex>
+				</Col>
+
+				<Col
+					xs={24}
+					md={24}
+					lg={8}
+				>
+					<Card
+						title="Последний запуск"
+						size="small"
+					>
+						<div>
+							<strong>Начало:</strong> {lastStart}
+						</div>
+						<div>
+							<strong>Длительность:</strong> {lastDuration}
+						</div>
+						<Divider style={{ margin: "8px 0" }} />
+						<div>
+							<strong>Отчёт:</strong> {reportSheets} листов, {reportRows} строк
+						</div>
+					</Card>
+				</Col>
+			</Row>
+
+			<Card title="Журнал (последние сообщения)">
 				<Space
 					direction="vertical"
 					style={{ width: "100%" }}
 				>
-					{log.map((record, index) => (
-						<Alert
-							message={`${dateFns.format(new Date(), "HH:mm")} - ${record.message}`}
-							type={record.level}
-							key={index}
-						/>
-					))}
+					{log.length === 0 ? (
+						<Text type="secondary">Записи журнала отсутствуют</Text>
+					) : (
+						log
+							.slice(-8)
+							.reverse()
+							.map((r, i) => (
+								<Alert
+									key={i}
+									type={
+										r.level === "error"
+											? "error"
+											: r.level === "warning"
+												? "warning"
+												: "info"
+									}
+									message={`${dateFns.format(new Date(r.timestamp), "HH:mm")} — ${r.message}`}
+									showIcon
+								/>
+							))
+					)}
 				</Space>
-			</Space>
-		</>
+			</Card>
+		</Space>
 	)
 }

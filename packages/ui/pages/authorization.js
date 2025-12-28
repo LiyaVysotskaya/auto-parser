@@ -10,17 +10,20 @@ export function Authorization() {
 	const navigate = useNavigate()
 	const onFinish = useCallback(
 		(values) => {
-			fetch(process.env.ELECTRON_RENDERER_AUTH_ENDPOINT, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(values),
-			})
+			fetch(
+				(process.env.ELECTRON_RENDERER_AUTH_ENDPOINT),
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(values),
+				},
+			)
 				.then((res) => {
 					if (!res.ok) return Promise.reject(new Error())
 				})
 				.then(() => {
 					localStorage.setItem("authorized", new Date().toISOString())
-					navigate(/** @type {string} */ (defaultRoutes.at(-1)))
+					navigate((defaultRoutes.at(-1)))
 				})
 				.catch(() => {
 					message.error("Не удалось авторизоваться")
@@ -35,7 +38,7 @@ export function Authorization() {
 			value === "true" ||
 			dateFns.differenceInDays(new Date(), new Date(value)) < 1
 		)
-			navigate(/** @type {string} */ (defaultRoutes.at(-1)))
+			navigate((defaultRoutes.at(-1)))
 	}, [])
 
 	return (

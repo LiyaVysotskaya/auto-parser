@@ -93,7 +93,9 @@ export function Settings() {
 						dispatch(setSettings(normalized))
 					}
 				}
-			} catch (err) {}
+			} catch (err) {
+				// noop
+			}
 		}
 		load()
 		return () => {

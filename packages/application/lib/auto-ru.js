@@ -7,33 +7,52 @@ import stealth from "puppeteer-extra-plugin-stealth"
 import { call, put, select, takeEvery } from "redux-saga/effects"
 import * as XLSX from "xlsx"
 
-import { config } from "../config.js"
+import { getConfig } from "../config.js"
 import * as store from "../store.js"
 
 puppeteer.use(stealth())
 
-export async function action(options = config().autoRu) {
+export async function action(options = getConfig().autoRu) {
 	let browser = null
 	try {
+		const effectiveOptions = options
+
+		const startMs = Date.now()
+		store.instance.dispatch(
+			store.autoRu.slice.actions.setLastRun({
+				startIso: new Date(startMs).toISOString(),
+				startMs,
+				endIso: null,
+				endMs: null,
+				durationMs: null,
+			}),
+		)
+		store.instance.dispatch(store.autoRu.slice.actions.status("pending"))
+
 		const reportGenerator = autoRuTools.report()
 		reportGenerator.next()
 
 		browser = await puppeteer.launch({
-			...options.browser,
+			...effectiveOptions.browser,
 			headless: false,
 			userDataDir: path.resolve(".browser"),
 		})
 		const page = await browser.newPage()
 
-		for (const mark of options.brands) {
-			for (let year = options.years.from; year <= options.years.to; year++) {
+		for (const mark of effectiveOptions.brands) {
+			for (
+				let year = effectiveOptions.years.from;
+				year <= effectiveOptions.years.to;
+				year++
+			) {
 				try {
-					const url = new URL(options.url)
+					store.instance.dispatch(store.autoRu.slice.actions.status("pending"))
+					const url = new URL(effectiveOptions.url)
 					url.pathname = `/sankt-peterburg/cars/${mark}/${year}-year/new/`
 					url.searchParams.set("output_type", "list")
 
 					const fullUrl = url.toString()
-					console.log(options.url)
+					console.log(effectiveOptions.url)
 					console.log("Переходим на:", fullUrl)
 
 					await page.goto(fullUrl, {
@@ -71,53 +90,78 @@ export async function action(options = config().autoRu) {
 
 		const finalReport = reportGenerator.next(autoRuTools.END_OF_REPORT).value
 
+		const endMs = Date.now()
+		const lastRunStartMs =
+			store.instance.getState().autoRu.lastRun?.startMs ?? startMs
+		const durationMs = endMs - (lastRunStartMs || endMs)
+		store.instance.dispatch(
+			store.autoRu.slice.actions.setLastRun({
+				endIso: new Date(endMs).toISOString(),
+				endMs,
+				durationMs,
+			}),
+		)
+
 		store.instance.dispatch(store.autoRu.slice.actions.report(finalReport))
+		await saveReportAutomatically(finalReport)
+
 		store.instance.dispatch(store.autoRu.slice.actions.status("success"))
 	} catch (error) {
 		console.error("Общая ошибка:", error)
+		const endMs = Date.now()
+		const lastRunStartMs =
+			store.instance.getState().autoRu.lastRun?.startMs ?? null
+		const durationMs = lastRunStartMs ? endMs - lastRunStartMs : null
+		store.instance.dispatch(
+			store.autoRu.slice.actions.setLastRun({
+				endIso: new Date(endMs).toISOString(),
+				endMs,
+				durationMs,
+			}),
+		)
+		store.instance.dispatch(store.autoRu.slice.actions.status("failed"))
 	} finally {
 		await browser?.close()
 	}
 }
 
-export function* xlsxReportFsSaga() {
-	yield takeEvery(store.autoRu.slice.actions.report.type, function* (action) {
-		try {
-			const report = action.payload
-			yield call(() => fs.mkdir(path.resolve("reports"), { recursive: true }))
+async function saveReportAutomatically(report) {
+	try {
+		await fs.mkdir(path.resolve("reports"), { recursive: true })
 
-			const file = path.resolve(
-				"reports",
-				autoRuTools.reportName(report, "xlsx"),
-			)
+		const fileName = autoRuTools.reportName(report, "xlsx")
+		const filePath = path.resolve("reports", fileName)
 
-			yield call(() =>
-				fs.writeFile(
-					file,
-					XLSX.write(autoRuTools.xlsx(report), {
-						bookType: "xlsx",
-						type: "buffer",
-					}),
-				),
-			)
+		const workbook = autoRuTools.xlsx(report)
+		await fs.writeFile(
+			filePath,
+			XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }),
+		)
 
-			yield put(
-				store.log.slice.actions.push({
-					level: "success",
-					message: `Файл отчета сохранен: ${file}`,
-					timestamp: new Date().toISOString(),
-					scope: "autoRu",
-				}),
-			)
-		} catch (error) {
-			yield put(
-				store.log.slice.actions.push({
-					level: "error",
-					message: `Не удалось сохранить файл отчета: ${error.stack ? error.stack : error.message}`,
-					timestamp: new Date().toISOString(),
-					scope: "autoRu",
-				}),
-			)
-		}
-	})
+		console.log("Отчет автоматически сохранен:", filePath)
+
+		store.instance.dispatch(
+			store.log.slice.actions.push({
+				level: "success",
+				message: `Файл отчета сохранен: ${filePath}`,
+				timestamp: new Date().toISOString(),
+				scope: "autoRu",
+			}),
+		)
+
+		return filePath
+	} catch (error) {
+		console.error("Ошибка автоматического сохранения отчета:", error)
+
+		store.instance.dispatch(
+			store.log.slice.actions.push({
+				level: "error",
+				message: `Не удалось сохранить файл отчета: ${error.message}`,
+				timestamp: new Date().toISOString(),
+				scope: "autoRu",
+			}),
+		)
+
+		throw error
+	}
 }

@@ -35,28 +35,15 @@ function formatDuration(ms) {
 
 export function AutoRu() {
 	const autoRuState = useSelector((state) => state.autoRu)
+	const settings = useSelector((state) => state.settings)
 	const log = useSelector((state) =>
 		state.log.filter(({ scope }) => scope === "autoRu"),
 	)
 
-	// Предустановленные настройки (все бренды включены)
-	const brands = [
-		{ id: "exeed", name: "Exeed", selected: true },
-		{ id: "geely", name: "Geely", selected: true },
-		{ id: "haval", name: "Haval", selected: true },
-		{ id: "chery", name: "Chery", selected: true },
-		{ id: "omoda", name: "Omoda", selected: true },
-		{ id: "jaecoo", name: "Jaecoo", selected: true },
-		{ id: "belgee", name: "Belgee", selected: true },
-		{ id: "jetour", name: "Jetour", selected: true },
-		{ id: "aito", name: "Aito", selected: true },
-		{ id: "seres", name: "Seres", selected: true },
-		{ id: "tenet", name: "Tenet", selected: true },
-	]
-	const selectedBrands = brands.filter((b) => b.selected)
+	const selectedBrands = (settings.brands || []).filter((b) => b.selected)
 	const selectedCount = selectedBrands.length
-	const totalBrands = brands.length
-	const years = { from: 2023, to: 2025 }
+	const totalBrands = (settings.brands || []).length
+	const years = settings.years || { from: "—", to: "—" }
 	const yearsText = `${years.from} — ${years.to}`
 
 	const report = autoRuState.report || []
@@ -134,7 +121,7 @@ export function AutoRu() {
 								gap: 8,
 							}}
 						>
-							{brands.map((b) => (
+							{(settings.brands || []).map((b) => (
 								<Tag
 									key={b.id}
 									color={b.selected ? "blue" : "default"}

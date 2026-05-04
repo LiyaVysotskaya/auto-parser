@@ -4,4 +4,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	autoRu: () => ipcRenderer.send("autoRu"),
 	onActions: (callback) =>
 		ipcRenderer.on("actions", (_event, action) => callback(action)),
+	getSettings: () => ipcRenderer.invoke("get-settings"),
+	saveSettings: (settings) => ipcRenderer.invoke("save-settings", settings),
 })

@@ -13,11 +13,18 @@ import {
 	SelectOutlined,
 	UploadOutlined,
 } from "@ant-design/icons"
+import {
+	DEFAULT_CITY_ID,
+	isKnownCityId,
+	mergeCityOptions,
+	normalizeExtraCityEntry,
+} from "@market-slice/application/settings/defaults.js"
 import { normalizeStoredSettings } from "@market-slice/application/settings/normalize.js"
 import {
 	reset,
 	setSettings,
 	toggleBrand,
+	updateCity,
 	updateYears,
 } from "@market-slice/application/slices/settings.js"
 import {
@@ -33,6 +40,7 @@ import {
 	Modal,
 	Popconfirm,
 	Row,
+	Select,
 	Space,
 	Tooltip,
 	Typography,
@@ -42,7 +50,7 @@ import {
 import { electron } from "../../electron.js"
 
 const { Search } = Input
-const { Title } = Typography
+const { Title, Text } = Typography
 
 export function Settings() {
 	const dispatch = useDispatch()
@@ -53,6 +61,10 @@ export function Settings() {
 	const [brandName, setBrandName] = useState("")
 	const [brandId, setBrandId] = useState("")
 	const [brandSelected, setBrandSelected] = useState(true)
+
+	const [cityModalVisible, setCityModalVisible] = useState(false)
+	const [newCityName, setNewCityName] = useState("")
+	const [newCityId, setNewCityId] = useState("")
 
 	const [query, setQuery] = useState("")
 	const [debouncedQuery, setDebouncedQuery] = useState("")
@@ -77,7 +89,12 @@ export function Settings() {
 	const handleSave = async () => {
 		setLoading(true)
 		try {
-			const payload = { brands: settings.brands, years: settings.years }
+			const payload = {
+				brands: settings.brands,
+				years: settings.years,
+				city: settings.city,
+				extraCities: settings.extraCities ?? [],
+			}
 			if (electron?.saveSettings) {
 				const ok = await electron.saveSettings(payload)
 				if (ok) {
@@ -178,7 +195,12 @@ export function Settings() {
 
 	const handleExport = () => {
 		try {
-			const payload = { brands: settings.brands, years: settings.years }
+			const payload = {
+				brands: settings.brands,
+				years: settings.years,
+				city: settings.city,
+				extraCities: settings.extraCities ?? [],
+			}
 			const data = JSON.stringify(payload, null, 2)
 			const blob = new Blob([data], { type: "application/json;charset=utf-8" })
 			const url = URL.createObjectURL(blob)
@@ -231,6 +253,73 @@ export function Settings() {
 
 	const selectedCount = (settings.brands || []).filter((b) => b.selected).length
 
+	const cityOptions = useMemo(
+		() => mergeCityOptions(settings.extraCities ?? []),
+		[settings.extraCities],
+	)
+
+	const generateCitySlug = (name) =>
+		String(name || "")
+			.trim()
+			.toLowerCase()
+			.replace(/\s+/g, "_")
+			.replace(/[^a-z0-9_-]/g, "")
+
+	useEffect(() => {
+		if (!cityModalVisible) return
+		setNewCityId(generateCitySlug(newCityName))
+	}, [newCityName, cityModalVisible])
+
+	const openCityModal = () => {
+		setNewCityName("")
+		setNewCityId("")
+		setCityModalVisible(true)
+	}
+
+	const handleCityModalOk = () => {
+		const entry = normalizeExtraCityEntry({
+			id: newCityId || generateCitySlug(newCityName),
+			name: newCityName,
+		})
+		if (!entry) {
+			message.error("Введите название города")
+			return
+		}
+		if (isKnownCityId(entry.id)) {
+			message.error("Такой город уже есть в базовом списке")
+			return
+		}
+		const extra = settings.extraCities ?? []
+		if (extra.some((c) => c.id === entry.id)) {
+			message.error("Город с таким id уже добавлен")
+			return
+		}
+		dispatch(
+			setSettings({
+				...settings,
+				extraCities: [...extra, entry],
+			}),
+		)
+		setCityModalVisible(false)
+		message.success("Город добавлен (не забудьте сохранить настройки)")
+	}
+
+	const handleRemoveExtraCity = (cityEntry) => {
+		const extra = (settings.extraCities ?? []).filter(
+			(c) => c.id !== cityEntry.id,
+		)
+		const nextCity =
+			settings.city === cityEntry.id ? DEFAULT_CITY_ID : settings.city
+		dispatch(
+			setSettings({
+				...settings,
+				extraCities: extra,
+				city: nextCity,
+			}),
+		)
+		message.success("Город удалён")
+	}
+
 	return (
 		<Space
 			direction="vertical"
@@ -243,6 +332,70 @@ export function Settings() {
 					style={{ width: "100%" }}
 					size="middle"
 				>
+					<Title level={4}>Город для парсинга</Title>
+					<Text type="secondary">
+						Выберите город, откуда будут собираться предложения.
+					</Text>
+					<Select
+						showSearch
+						optionFilterProp="label"
+						style={{ width: "100%", maxWidth: 480 }}
+						placeholder="Выберите город"
+						value={settings.city}
+						onChange={(value) => dispatch(updateCity(value))}
+						options={cityOptions.map((c) => ({
+							value: c.id,
+							label: c.name,
+						}))}
+					/>
+
+					<Title level={5}>Свои города</Title>
+					<Text type="secondary">
+						Добавьте регион auto.ru по slug из URL (например{" "}
+						<code>voronezh</code> из <code>auto.ru/voronezh/cars/...</code>).
+						Встроенные города удалять нельзя.
+					</Text>
+					<Space
+						wrap
+						style={{ marginBottom: 8 }}
+					>
+						<Button
+							type="dashed"
+							icon={<PlusOutlined />}
+							onClick={openCityModal}
+						>
+							Добавить город
+						</Button>
+					</Space>
+					<List
+						size="small"
+						dataSource={settings.extraCities ?? []}
+						locale={{ emptyText: "Нет пользовательских городов" }}
+						renderItem={(c) => (
+							<List.Item
+								actions={[
+									<Popconfirm
+										key="del"
+										title={`Удалить город «${c.name}»?`}
+										onConfirm={() => handleRemoveExtraCity(c)}
+										okText="Да"
+										cancelText="Нет"
+									>
+										<Button
+											size="small"
+											danger
+											type="link"
+											icon={<DeleteOutlined />}
+										/>
+									</Popconfirm>,
+								]}
+							>
+								<strong>{c.name}</strong>{" "}
+								<span style={{ color: "#888", fontSize: 12 }}>{c.id}</span>
+							</List.Item>
+						)}
+					/>
+
 					<Title level={4}>Диапазон годов выпуска</Title>
 					<Row gutter={16}>
 						<Col span={12}>
@@ -441,6 +594,33 @@ export function Settings() {
 					Применить и сохранить
 				</Button>
 			</Space>
+
+			<Modal
+				title="Добавить город"
+				open={cityModalVisible}
+				onOk={handleCityModalOk}
+				onCancel={() => setCityModalVisible(false)}
+				okText="Добавить"
+				cancelText="Отмена"
+			>
+				<Space
+					direction="vertical"
+					style={{ width: "100%" }}
+				>
+					<label>Название (для списка)</label>
+					<Input
+						value={newCityName}
+						onChange={(e) => setNewCityName(e.target.value)}
+						placeholder="Например: Владивосток"
+					/>
+					<label>ID региона (slug в URL auto.ru; можно править вручную)</label>
+					<Input
+						value={newCityId}
+						onChange={(e) => setNewCityId(e.target.value)}
+						placeholder="например: vladivostok"
+					/>
+				</Space>
+			</Modal>
 
 			<Modal
 				title={editingBrand ? "Редактирование бренда" : "Добавить бренд"}

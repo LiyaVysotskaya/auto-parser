@@ -20,6 +20,114 @@ const COLUMNS = [
 	{ key: "insuranceDiscount", title: "Скидка КАСКО", width: 15 },
 ]
 
+const TITLE_TO_KEY = Object.fromEntries(COLUMNS.map((c) => [c.title, c.key]))
+
+const TEXT_KEYS = new Set(["model", "equipment", "modification", "dealer"])
+
+const INTEGER_KEYS = new Set(["year", "count"])
+
+const NUMERIC_KEYS = new Set([
+	"price",
+	"priceMin",
+	"secondPrice",
+	"specialistsProposal",
+	"REKCProposal",
+	"agreedPrice",
+	"maxDiscount",
+	"tradeInDiscount",
+	"creditDiscount",
+	"insuranceDiscount",
+])
+
+function parseNumberLoose(v) {
+	if (v == null || v === "") return null
+	if (typeof v === "number") {
+		return Number.isFinite(v) ? v : null
+	}
+	const s = String(v).trim()
+	if (s === "") return null
+	let cleaned = s.replace(/\s+/g, "").replace(/[^0-9,.\-]/g, "")
+	if (cleaned.indexOf(",") >= 0 && cleaned.indexOf(".") === -1) {
+		cleaned = cleaned.replace(",", ".")
+	}
+	const n = Number(cleaned)
+	return Number.isFinite(n) ? n : null
+}
+
+function coerceImportedCell(key, raw) {
+	if (raw == null || raw === "") return null
+	if (TEXT_KEYS.has(key)) {
+		const t = String(raw).trim()
+		return t || null
+	}
+	if (INTEGER_KEYS.has(key)) {
+		const n = parseNumberLoose(raw)
+		if (n == null) return null
+		if (key === "count") return Math.max(0, Math.floor(n))
+		return Math.floor(n)
+	}
+	if (NUMERIC_KEYS.has(key)) {
+		return parseNumberLoose(raw)
+	}
+	return null
+}
+
+export function parseXlsx(buffer) {
+	const data = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)
+	const workbook = XLSX.read(data, { type: "array", cellDates: false })
+	const report = []
+
+	for (const sheetName of workbook.SheetNames) {
+		const ws = workbook.Sheets[sheetName]
+		if (!ws) continue
+
+		const aoa = XLSX.utils.sheet_to_json(ws, {
+			header: 1,
+			raw: true,
+			defval: null,
+		})
+		if (!aoa.length) {
+			report.push({ name: sheetName.trim() || "Unknown", rows: [] })
+			continue
+		}
+
+		const headerRow = (aoa[0] || []).map((h) =>
+			h == null ? "" : String(h).trim(),
+		)
+		const colIndexToKey = headerRow.map((title) => TITLE_TO_KEY[title] ?? null)
+
+		if (!colIndexToKey.some(Boolean)) {
+			continue
+		}
+
+		const rows = []
+		for (let i = 1; i < aoa.length; i++) {
+			const line = aoa[i] || []
+			const row = {}
+			let hasData = false
+
+			for (let j = 0; j < colIndexToKey.length; j++) {
+				const key = colIndexToKey[j]
+				if (!key) continue
+				const cell = line[j]
+				const coerced = coerceImportedCell(key, cell)
+				row[key] = coerced
+				if (coerced != null && coerced !== "") hasData = true
+			}
+
+			if (!hasData) continue
+			rows.push(row)
+		}
+
+		report.push({
+			name: sheetName.trim() || "Unknown",
+			rows,
+		})
+	}
+
+	return report
+}
+
 function columnWidths() {
 	return COLUMNS.map((c) => ({ wch: c.width }))
 }

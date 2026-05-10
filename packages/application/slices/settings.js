@@ -24,6 +24,9 @@ export const slice = createSlice({
 		updateYears(state, action) {
 			state.years = action.payload
 		},
+		updateCity(state, action) {
+			state.city = action.payload
+		},
 		setSettings(state, action) {
 			return { ...state, ...action.payload }
 		},
@@ -33,6 +36,12 @@ export const slice = createSlice({
 	},
 })
 
-export const { updateBrands, toggleBrand, updateYears, setSettings, reset } =
-	slice.actions
+export const {
+	updateBrands,
+	toggleBrand,
+	updateYears,
+	updateCity,
+	setSettings,
+	reset,
+} = slice.actions
 export default slice.reducer

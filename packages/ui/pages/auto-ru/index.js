@@ -1,11 +1,14 @@
-import React from "react"
-import { useSelector } from "react-redux"
+import React, { useMemo, useRef } from "react"
+import { useDispatch, useSelector } from "react-redux"
 
 import {
 	DownloadOutlined,
 	PlayCircleOutlined,
 	StopOutlined,
+	UploadOutlined,
 } from "@ant-design/icons"
+import { mergeCityOptions } from "@market-slice/application/settings/defaults.js"
+import * as appStore from "@market-slice/application/store"
 import * as autoRuTools from "@market-slice/auto-ru"
 import {
 	Alert,
@@ -18,6 +21,7 @@ import {
 	Statistic,
 	Tag,
 	Typography,
+	message,
 } from "antd"
 import * as dateFns from "date-fns"
 import * as XLSX from "xlsx"
@@ -38,6 +42,8 @@ function formatDuration(ms) {
 }
 
 export function AutoRu() {
+	const dispatch = useDispatch()
+	const uploadReportInputRef = useRef(null)
 	const autoRuState = useSelector((state) => state.autoRu)
 	const settings = useSelector((state) => state.settings)
 	const log = useSelector((state) =>
@@ -49,6 +55,15 @@ export function AutoRu() {
 	const totalBrands = (settings.brands || []).length
 	const years = settings.years || { from: "—", to: "—" }
 	const yearsText = `${years.from} — ${years.to}`
+
+	const cityDisplay = useMemo(() => {
+		const opts = mergeCityOptions(settings.extraCities ?? [])
+		const hit = opts.find((c) => c.id === settings.city)
+		return {
+			name: hit?.name ?? settings.city ?? "—",
+			slug: settings.city ?? "—",
+		}
+	}, [settings.city, settings.extraCities])
 
 	const report = autoRuState.report || []
 	const reportSheets = report.length
@@ -109,6 +124,46 @@ export function AutoRu() {
 						>
 							Скачать отчёт
 						</Button>
+
+						<input
+							ref={uploadReportInputRef}
+							type="file"
+							accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+							style={{ display: "none" }}
+							onChange={async (ev) => {
+								const file = ev.target.files?.[0]
+								if (!file) return
+								try {
+									const buf = await file.arrayBuffer()
+									const parsed = autoRuTools.parseXlsx(buf)
+									if (!parsed.length) {
+										message.error(
+											"Не удалось прочитать файл: нет листов с ожидаемыми заголовками столбцов",
+										)
+										return
+									}
+									dispatch(appStore.autoRu.slice.actions.report(parsed))
+									message.success(
+										`Отчёт загружен: ${parsed.length} лист(ов). Откройте страницу «Отчёт» для аналитики.`,
+									)
+								} catch (err) {
+									console.error(err)
+									message.error(
+										`Ошибка чтения XLSX: ${err?.message || String(err)}`,
+									)
+								} finally {
+									if (uploadReportInputRef.current) {
+										uploadReportInputRef.current.value = ""
+									}
+								}
+							}}
+						/>
+						<Button
+							icon={<UploadOutlined />}
+							onClick={() => uploadReportInputRef.current?.click()}
+						>
+							Загрузить отчёт
+						</Button>
 					</Space>
 				</Col>
 			</Row>
@@ -117,7 +172,7 @@ export function AutoRu() {
 				<Col
 					xs={24}
 					md={12}
-					lg={8}
+					lg={6}
 				>
 					<Card
 						title="Бренды для парсинга"
@@ -149,7 +204,7 @@ export function AutoRu() {
 				<Col
 					xs={24}
 					md={12}
-					lg={8}
+					lg={6}
 				>
 					<Card
 						title="Диапазон годов"
@@ -164,8 +219,27 @@ export function AutoRu() {
 
 				<Col
 					xs={24}
+					md={12}
+					lg={6}
+				>
+					<Card
+						title="Город парсинга"
+						size="small"
+					>
+						<Statistic
+							title="Регион"
+							value={cityDisplay.name}
+						/>
+						<div style={{ marginTop: 8 }}>
+							<Text type="secondary">slug: {cityDisplay.slug}</Text>
+						</div>
+					</Card>
+				</Col>
+
+				<Col
+					xs={24}
 					md={24}
-					lg={8}
+					lg={6}
 				>
 					<Card
 						title="Последний запуск"

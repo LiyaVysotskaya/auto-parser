@@ -10,6 +10,7 @@ const forwardedActionTypes = new Set([
 	store.settings.slice.actions.updateBrands.type,
 	store.settings.slice.actions.toggleBrand.type,
 	store.settings.slice.actions.updateYears.type,
+	store.settings.slice.actions.updateCity.type,
 	store.settings.slice.actions.setSettings.type,
 	store.settings.slice.actions.reset.type,
 ])

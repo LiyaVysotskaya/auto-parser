@@ -204,6 +204,55 @@ export function groupByBrand(perModelSummary) {
 	return perBrand
 }
 
+export function analyticsForSingleTab(tab) {
+	const slice = tab && Array.isArray(tab.rows) ? [tab] : []
+	const { rowsFlat, dealerCounts } = flattenReport(slice)
+	const summary = computeSummary(rowsFlat)
+	const { topCheapest, topDiscounts, topValue, topDealers } = computeTopLists(
+		rowsFlat,
+		dealerCounts,
+	)
+	const perModelSummary = groupByModel(rowsFlat)
+
+	const topModelsByPct = perModelSummary
+		.filter((m) => m.bestDiscountPct != null)
+		.map((m) => ({
+			brand: m.brand,
+			model: m.model,
+			equipment: m.equipment,
+			modification: m.modification,
+			year: m.year,
+			priceMin: m.priceMin,
+			priceMinDealer: m.priceMinDealer,
+			minPrice: m.minPrice,
+			minDealer: m.minDealer,
+			bestDiscountAbs: m.bestDiscountAbs,
+			bestDiscountPct: m.bestDiscountPct,
+			totalOffers: m.totalOffers,
+		}))
+		.sort((a, b) => (b.bestDiscountPct || 0) - (a.bestDiscountPct || 0))
+		.slice(0, 10)
+
+	return {
+		summary,
+		topCheapest,
+		topDiscounts,
+		topValue,
+		topDealers,
+		topModelsByPct,
+		perModelSummary,
+	}
+}
+
+export function computePerBrandAnalytics(report = []) {
+	const out = {}
+	for (const tab of report) {
+		const brand = tab?.name || "Unknown"
+		out[brand] = analyticsForSingleTab(tab)
+	}
+	return out
+}
+
 export function generateComprehensiveAnalytics(report = []) {
 	const { rowsFlat, dealerCounts } = flattenReport(report)
 	const summary = computeSummary(rowsFlat)
@@ -239,6 +288,8 @@ export function generateComprehensiveAnalytics(report = []) {
 		.slice(0, 10)
 		.map((item) => ({ ...item, topDealer: item.minDealer || "—" }))
 
+	const perBrandAnalytics = computePerBrandAnalytics(report)
+
 	return {
 		summary,
 		topCheapest,
@@ -249,5 +300,6 @@ export function generateComprehensiveAnalytics(report = []) {
 		topByDiscountPct,
 		perBrand,
 		perModelSummary,
+		perBrandAnalytics,
 	}
 }

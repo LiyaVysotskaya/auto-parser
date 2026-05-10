@@ -50,6 +50,7 @@ program
 		const config = getConfig()
 		const effectiveOptions = {
 			url: options.url || config.autoRu.url,
+			city: config.autoRu.city,
 			browser: {
 				executablePath:
 					options.browserPath || config.autoRu.browser.executablePath,

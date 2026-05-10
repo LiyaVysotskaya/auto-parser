@@ -18,19 +18,22 @@ function loadSettings() {
 	return {
 		brands: getSelectedBrandIds(settings),
 		years: settings.years,
+		city: settings.city,
 	}
 }
 
 const settings = loadSettings()
+const listingUrl =
+	process.env.AUTO_RU_LISTING_URL ??
+	`https://auto.ru/${settings.city}/cars/new/?output_type=list`
 
 const config = {
 	autoRu: {
 		browser: {
 			executablePath: process.env.CHROME_EXECUTABLE_PATH ?? chromePaths.chrome,
 		},
-		url:
-			process.env.AUTO_RU_LISTING_URL ??
-			"https://auto.ru/sankt-peterburg/cars/new/?output_type=list",
+		url: listingUrl,
+		city: settings.city,
 		brands: settings.brands,
 		years: settings.years,
 	},

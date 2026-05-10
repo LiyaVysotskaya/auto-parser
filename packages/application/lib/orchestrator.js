@@ -13,10 +13,13 @@ const GOTO_OPTIONS = Object.freeze({
 	timeout: 60_000,
 })
 
-function buildListingUrl(baseUrlStr, mark, year) {
+function buildListingUrl(baseUrlStr, mark, year, options = {}) {
 	const u = new URL(baseUrlStr)
 	const parts = u.pathname.split("/").filter(Boolean)
-	const region = parts[0] ?? "sankt-peterburg"
+	const region =
+		(options.city && String(options.city).trim()) ||
+		parts[0] ||
+		"sankt-peterburg"
 	u.pathname = `/${region}/cars/${mark}/${year}-year/new/`
 	u.searchParams.set("output_type", "list")
 	return u.toString()
@@ -52,7 +55,7 @@ async function scrapeBrandYear(
 	{ onOffer },
 	signal,
 ) {
-	const fullUrl = buildListingUrl(options.url, mark, year)
+	const fullUrl = buildListingUrl(options.url, mark, year, options)
 	console.log("[auto-ru] Navigate:", fullUrl)
 
 	await page.goto(fullUrl, GOTO_OPTIONS)

@@ -32,16 +32,18 @@ async function readParserSettings(userSettingsPath, projectSettingsPath) {
 }
 
 function createEffectiveOptions(app, settings) {
+	const normalized = normalizeSettingsOrDefault(settings)
+	const city = normalized.city
+	const defaultListingUrl = `https://auto.ru/${city}/cars/new/?output_type=list`
 	return {
-		url:
-			process.env.AUTO_RU_LISTING_URL ||
-			"https://auto.ru/sankt-peterburg/cars/new/?output_type=list",
+		url: process.env.AUTO_RU_LISTING_URL || defaultListingUrl,
+		city,
 		browser: {
 			executablePath: process.env.CHROME_EXECUTABLE_PATH || chromePaths.chrome,
 		},
 		userDataDir: path.join(app.getPath("userData"), "puppeteer-profile"),
 		brands: getSelectedBrandIds(settings),
-		years: settings.years,
+		years: normalized.years,
 	}
 }
 

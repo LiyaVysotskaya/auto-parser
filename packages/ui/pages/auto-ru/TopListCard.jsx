@@ -4,7 +4,7 @@ import { Card, Col, Row, Table } from "antd"
 export function TopListCard({ icon, title, data, columns }) {
 	return (
 		<Row style={{ marginBottom: 16 }}>
-			<Col>
+			<Col span={24}>
 				<Card
 					title={
 						<>

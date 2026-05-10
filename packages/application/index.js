@@ -11,7 +11,7 @@ import { fileURLToPath } from "url"
 
 import { getConfig } from "./config.js"
 import * as autoRu from "./lib/auto-ru.js"
-import { sagaMiddleware, instance as store } from "./store.js"
+import { instance as store } from "./store.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 

@@ -4,6 +4,8 @@
 	"bin": "./index.js",
 	"exports": {
 		".": "./lib/index.js",
+		"./settings": "./settings/index.js",
+		"./settings/*": "./settings/*",
 		"./store": "./store.js",
 		"./slices/*": "./slices/*"
 	},

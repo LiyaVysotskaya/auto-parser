@@ -1,52 +1,23 @@
 import "dotenv/config"
 
 import chromePaths from "chrome-paths"
-import fs from "fs"
 import path from "path"
 import { fileURLToPath } from "url"
 
-import { DEFAULT_YEARS, getDefaultBrandIds } from "./settingsDefaults.js"
+import {
+	getSelectedBrandIds,
+	loadSettingsSync,
+	saveSettingsSync,
+} from "./settings/index.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const settingsPath = path.join(__dirname, "..", "..", "auto-ru-settings.json")
 
 function loadSettings() {
-	try {
-		const settingsPath = path.join(
-			__dirname,
-			"..",
-			"..",
-			"auto-ru-settings.json",
-		)
-		if (fs.existsSync(settingsPath)) {
-			const data = fs.readFileSync(settingsPath, "utf-8")
-			const settings = JSON.parse(data)
-
-			if (settings && Array.isArray(settings.brands)) {
-				const brands = settings.brands
-					.map((b) => {
-						if (typeof b === "string") return b
-						if (b && typeof b === "object")
-							return b.id ?? (b.name ? String(b.name).toLowerCase() : "")
-						return ""
-					})
-					.filter(Boolean)
-
-				return {
-					brands,
-					years: settings.years ?? { ...DEFAULT_YEARS },
-				}
-			}
-		}
-	} catch (error) {
-		console.log(
-			"Не удалось загрузить настройки, используем по умолчанию:",
-			error.message,
-		)
-	}
-
+	const settings = loadSettingsSync(settingsPath)
 	return {
-		brands: getDefaultBrandIds(),
-		years: { ...DEFAULT_YEARS },
+		brands: getSelectedBrandIds(settings),
+		years: settings.years,
 	}
 }
 
@@ -71,13 +42,7 @@ export function getConfig() {
 
 export function saveSettings(newSettings) {
 	try {
-		const settingsPath = path.join(
-			__dirname,
-			"..",
-			"..",
-			"auto-ru-settings.json",
-		)
-		fs.writeFileSync(settingsPath, JSON.stringify(newSettings, null, 2))
+		saveSettingsSync(settingsPath, newSettings)
 		return true
 	} catch (error) {
 		console.error("Ошибка сохранения настроек:", error)

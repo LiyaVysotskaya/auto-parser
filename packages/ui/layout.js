@@ -1,8 +1,8 @@
 import React from "react"
+import { useSelector } from "react-redux"
 import { Outlet, useLocation, useNavigate } from "react-router-dom"
 
 import { BugOutlined } from "@ant-design/icons"
-import * as store from "@market-slice/application/store"
 import { Layout as AntdLayout, FloatButton, Menu } from "antd"
 import * as dateFns from "date-fns"
 
@@ -12,6 +12,7 @@ const { Content, Sider } = AntdLayout
 
 export function Layout() {
 	const navigate = useNavigate()
+	const logs = useSelector((state) => state.log)
 
 	return (
 		<AntdLayout hasSider>
@@ -56,11 +57,7 @@ export function Layout() {
 							const a = document.createElement("a")
 							const href = (a.href = URL.createObjectURL(
 								new Blob(
-									[
-										store.log.list
-											.map((record) => JSON.stringify(record))
-											.join("\n"),
-									],
+									[logs.map((record) => JSON.stringify(record)).join("\n")],
 									{ type: "text/plain" },
 								),
 							))

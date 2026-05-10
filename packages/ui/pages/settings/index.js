@@ -13,8 +13,8 @@ import {
 	SelectOutlined,
 	UploadOutlined,
 } from "@ant-design/icons"
+import { normalizeStoredSettings } from "@market-slice/application/settings/normalize.js"
 import {
-	normalizeStoredSettings,
 	reset,
 	setSettings,
 	toggleBrand,
@@ -226,20 +226,10 @@ export function Settings() {
 				message.error("Неверный формат файла")
 				return
 			}
-			const normalized = {
-				...parsed,
-				brands: parsed.brands.map((b) => {
-					if (typeof b === "string") {
-						const id = String(b).toLowerCase()
-						const name = String(b).charAt(0).toUpperCase() + String(b).slice(1)
-						return { id, name, selected: true }
-					}
-					return {
-						id: b.id ?? String(b.name ?? "").toLowerCase(),
-						name: b.name ?? (b.id ? String(b.id).toUpperCase() : ""),
-						selected: typeof b.selected === "boolean" ? b.selected : true,
-					}
-				}),
+			const normalized = normalizeStoredSettings(parsed)
+			if (!normalized) {
+				message.error("Неверный формат файла")
+				return
 			}
 			dispatch(setSettings(normalized))
 			message.success("Импорт настроек выполнен")

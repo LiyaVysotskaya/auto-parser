@@ -2,10 +2,8 @@ import React, { useCallback, useEffect, useState } from "react"
 import { useDispatch } from "react-redux"
 import { RouterProvider, createMemoryRouter } from "react-router-dom"
 
-import {
-	normalizeStoredSettings,
-	setSettings,
-} from "@market-slice/application/slices/settings.js"
+import { normalizeStoredSettings } from "@market-slice/application/settings/normalize.js"
+import { setSettings } from "@market-slice/application/slices/settings.js"
 import { App as AntdApp, ConfigProvider, theme } from "antd"
 import "normalize.css"
 

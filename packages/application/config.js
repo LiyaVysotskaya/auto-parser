@@ -5,7 +5,7 @@ import path from "path"
 import { fileURLToPath } from "url"
 
 import {
-	getSelectedBrandIds,
+	getSelectedBrandRuns,
 	loadSettingsSync,
 	saveSettingsSync,
 } from "./settings/index.js"
@@ -16,7 +16,7 @@ const settingsPath = path.join(__dirname, "..", "..", "auto-ru-settings.json")
 function loadSettings() {
 	const settings = loadSettingsSync(settingsPath)
 	return {
-		brands: getSelectedBrandIds(settings),
+		brands: getSelectedBrandRuns(settings),
 		years: settings.years,
 		city: settings.city,
 	}

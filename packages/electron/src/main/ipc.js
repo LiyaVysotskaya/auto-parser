@@ -4,8 +4,11 @@ const fs = require("node:fs/promises")
 const {
 	autoRu,
 	cancelAutoRu,
+	fetchCatalogBrands,
+	fetchCatalogModels,
+	getDefaultBrandCatalog,
 	getDefaultSettings,
-	getSelectedBrandIds,
+	getSelectedBrandRuns,
 	loadSettings,
 	normalizeSettingsOrDefault,
 	saveSettings,
@@ -42,7 +45,7 @@ function createEffectiveOptions(app, settings) {
 			executablePath: process.env.CHROME_EXECUTABLE_PATH || chromePaths.chrome,
 		},
 		userDataDir: path.join(app.getPath("userData"), "puppeteer-profile"),
-		brands: getSelectedBrandIds(settings),
+		brands: getSelectedBrandRuns(settings),
 		years: normalized.years,
 	}
 }
@@ -90,10 +93,15 @@ function registerIpcHandlers({ app, ipcMain }) {
 	})
 
 	ipcMain.handle("get-settings", async () => {
-		if (!(await exists(userSettingsPath))) {
+		try {
+			if (!(await exists(userSettingsPath))) {
+				return getDefaultSettings()
+			}
+			return await loadSettings(userSettingsPath)
+		} catch (error) {
+			console.error("get-settings:", error)
 			return getDefaultSettings()
 		}
-		return loadSettings(userSettingsPath)
 	})
 
 	ipcMain.handle("save-settings", async (event, settings) => {
@@ -103,6 +111,51 @@ function registerIpcHandlers({ app, ipcMain }) {
 		} catch (error) {
 			console.error("Error saving settings:", error)
 			return false
+		}
+	})
+
+	ipcMain.handle("fetch-brands", async () => {
+		try {
+			const settings = await readParserSettings(
+				userSettingsPath,
+				projectSettingsPath,
+			)
+			const effectiveOptions = createEffectiveOptions(app, settings)
+			const items = await fetchCatalogBrands(effectiveOptions)
+			return { ok: true, items }
+		} catch (error) {
+			console.error("fetch-brands:", error)
+			return {
+				ok: false,
+				error: error?.message || String(error),
+				items: getDefaultBrandCatalog(),
+			}
+		}
+	})
+
+	ipcMain.handle("fetch-models", async (_event, payload) => {
+		const brandId =
+			payload && typeof payload === "object" && payload.brandId
+				? String(payload.brandId)
+				: ""
+		if (!brandId) {
+			return { ok: false, error: "brandId required", items: [] }
+		}
+		try {
+			const settings = await readParserSettings(
+				userSettingsPath,
+				projectSettingsPath,
+			)
+			const effectiveOptions = createEffectiveOptions(app, settings)
+			const items = await fetchCatalogModels(effectiveOptions, brandId)
+			return { ok: true, items }
+		} catch (error) {
+			console.error("fetch-models:", error)
+			return {
+				ok: false,
+				error: error?.message || String(error),
+				items: [],
+			}
 		}
 	})
 }

@@ -2,25 +2,7 @@ export const DEFAULT_YEARS = Object.freeze({ from: 2023, to: 2026 })
 
 export const CITIES = Object.freeze([
 	{ id: "sankt-peterburg", name: "Санкт-Петербург" },
-	{ id: "moskva", name: "Москва" },
-	{ id: "krasnodar", name: "Краснодар" },
-	{ id: "novosibirsk", name: "Новосибирск" },
-	{ id: "ekaterinburg", name: "Екатеринбург" },
-	{ id: "kazan", name: "Казань" },
-	{ id: "nizhniy_novgorod", name: "Нижний Новгород" },
-	{ id: "chelyabinsk", name: "Челябинск" },
-	{ id: "samara", name: "Самара" },
-	{ id: "omsk", name: "Омск" },
-	{ id: "rostov_na_donu", name: "Ростов-на-Дону" },
 	{ id: "ufa", name: "Уфа" },
-	{ id: "krasnoyarsk", name: "Красноярск" },
-	{ id: "voronezh", name: "Воронеж" },
-	{ id: "perm", name: "Пермь" },
-	{ id: "volgograd", name: "Волгоград" },
-	{ id: "tyumen", name: "Тюмень" },
-	{ id: "irkutsk", name: "Иркутск" },
-	{ id: "kaliningrad", name: "Калининград" },
-	{ id: "tolyatti", name: "Тольятти" },
 ])
 
 export const DEFAULT_CITY_ID = "sankt-peterburg"
@@ -87,9 +69,17 @@ export function getDefaultBrandIds() {
 	return [...DEFAULT_BRANDS.map((b) => b.id)]
 }
 
+export function getDefaultBrandCatalog() {
+	return DEFAULT_BRANDS.map(({ id, name }) => ({ id, name }))
+}
+
 export function getDefaultSettings() {
 	return {
-		brands: DEFAULT_BRANDS.map((b) => ({ ...b, selected: true })),
+		brands: DEFAULT_BRANDS.map((b) => ({
+			...b,
+			selected: true,
+			models: [],
+		})),
 		years: { ...DEFAULT_YEARS },
 		city: DEFAULT_CITY_ID,
 		extraCities: [],

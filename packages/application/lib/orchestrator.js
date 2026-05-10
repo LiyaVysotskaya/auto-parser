@@ -13,14 +13,28 @@ const GOTO_OPTIONS = Object.freeze({
 	timeout: 60_000,
 })
 
-function buildListingUrl(baseUrlStr, mark, year, options = {}) {
+function buildListingUrl(
+	baseUrlStr,
+	mark,
+	year,
+	options = {},
+	modelSlug = null,
+) {
 	const u = new URL(baseUrlStr)
 	const parts = u.pathname.split("/").filter(Boolean)
 	const region =
 		(options.city && String(options.city).trim()) ||
 		parts[0] ||
 		"sankt-peterburg"
-	u.pathname = `/${region}/cars/${mark}/${year}-year/new/`
+	const m =
+		modelSlug != null && String(modelSlug).trim()
+			? String(modelSlug).trim().toLowerCase()
+			: ""
+	if (m) {
+		u.pathname = `/${region}/cars/${mark}/${m}/${year}-year/new/`
+	} else {
+		u.pathname = `/${region}/cars/${mark}/${year}-year/new/`
+	}
 	u.searchParams.set("output_type", "list")
 	return u.toString()
 }
@@ -50,12 +64,13 @@ async function scrapeBrandYear(
 	page,
 	mark,
 	year,
+	modelSlug,
 	options,
 	reportBuilder,
 	{ onOffer },
 	signal,
 ) {
-	const fullUrl = buildListingUrl(options.url, mark, year, options)
+	const fullUrl = buildListingUrl(options.url, mark, year, options, modelSlug)
 	console.log("[auto-ru] Navigate:", fullUrl)
 
 	await page.goto(fullUrl, GOTO_OPTIONS)
@@ -63,7 +78,9 @@ async function scrapeBrandYear(
 	const count = await autoRuTools.init(page)
 
 	if (count === 0) {
-		console.log(`[auto-ru] No offers, skip: ${mark} ${year}`)
+		console.log(
+			`[auto-ru] No offers, skip: ${mark}${modelSlug ? `/${modelSlug}` : ""} ${year}`,
+		)
 		return
 	}
 
@@ -79,7 +96,9 @@ async function scrapeBrandYear(
 		})
 	}
 
-	console.log(`[auto-ru] Done ${mark} ${year}: ${offerCount} offer(s)`)
+	console.log(
+		`[auto-ru] Done ${mark}${modelSlug ? `/${modelSlug}` : ""} ${year}: ${offerCount} offer(s)`,
+	)
 }
 
 async function finalizeRun(reportBuilder, callbacks, startMs, { cancelled }) {
@@ -150,45 +169,63 @@ export async function runAutoRu(options, callbacks = {}, signal) {
 		browser = await launchBrowser(options)
 		const page = await browser.newPage()
 
-		outer: for (const mark of options.brands) {
-			for (let year = options.years.from; year <= options.years.to; year++) {
-				if (signal?.aborted) {
-					cancelled = true
-					break outer
-				}
-
-				try {
-					onStatus("pending")
-					await scrapeBrandYear(
-						page,
-						mark,
-						year,
-						options,
-						reportBuilder,
-						{ onOffer },
-						signal,
-					)
-				} catch (error) {
-					if (error?.name === "AbortError" || signal?.aborted) {
+		outer: for (const brandRun of options.brands) {
+			const mark =
+				typeof brandRun === "string" ? brandRun : String(brandRun?.id || "")
+			if (!mark) continue
+			const modelSlugs =
+				brandRun &&
+				typeof brandRun === "object" &&
+				Array.isArray(brandRun.models) &&
+				brandRun.models.length > 0
+					? brandRun.models
+							.map((x) => String(x).trim().toLowerCase())
+							.filter(Boolean)
+					: [null]
+			for (const modelSlug of modelSlugs) {
+				for (let year = options.years.from; year <= options.years.to; year++) {
+					if (signal?.aborted) {
 						cancelled = true
 						break outer
 					}
-					console.error(`[auto-ru] Error ${mark} ${year}:`, error.message)
-				}
 
-				if (signal?.aborted) {
-					cancelled = true
-					break outer
-				}
+					try {
+						onStatus("pending")
+						await scrapeBrandYear(
+							page,
+							mark,
+							year,
+							modelSlug,
+							options,
+							reportBuilder,
+							{ onOffer },
+							signal,
+						)
+					} catch (error) {
+						if (error?.name === "AbortError" || signal?.aborted) {
+							cancelled = true
+							break outer
+						}
+						console.error(
+							`[auto-ru] Error ${mark}${modelSlug ? `/${modelSlug}` : ""} ${year}:`,
+							error.message,
+						)
+					}
 
-				try {
-					await delay(DELAYS.betweenCombinations, signal)
-				} catch (error) {
-					if (error?.name === "AbortError" || signal?.aborted) {
+					if (signal?.aborted) {
 						cancelled = true
 						break outer
 					}
-					throw error
+
+					try {
+						await delay(DELAYS.betweenCombinations, signal)
+					} catch (error) {
+						if (error?.name === "AbortError" || signal?.aborted) {
+							cancelled = true
+							break outer
+						}
+						throw error
+					}
 				}
 			}
 		}

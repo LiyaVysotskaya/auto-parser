@@ -2,6 +2,7 @@ export {
 	CITIES,
 	DEFAULT_CITY_ID,
 	DEFAULT_YEARS,
+	getDefaultBrandCatalog,
 	getDefaultBrandIds,
 	getDefaultSettings,
 	isAllowedCityId,
@@ -11,6 +12,7 @@ export {
 } from "./defaults.js"
 export {
 	getSelectedBrandIds,
+	getSelectedBrandRuns,
 	normalizeSettingsOrDefault,
 	normalizeStoredSettings,
 } from "./normalize.js"

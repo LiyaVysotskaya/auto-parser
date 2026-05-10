@@ -24,6 +24,7 @@ import {
 } from "antd"
 
 import { generateComprehensiveAnalytics } from "../../analytics.js"
+import { DealerComparison } from "./DealerComparison.jsx"
 import { TopListCard } from "./TopListCard.jsx"
 import { detailedColumns, topOfferColumns } from "./columns.jsx"
 
@@ -353,6 +354,10 @@ export function AutoRuReport() {
 					</Collapse>
 				)}
 			</Card>
+
+			<div style={{ marginTop: 16 }}>
+				<DealerComparison report={report} />
+			</div>
 		</div>
 	)
 }

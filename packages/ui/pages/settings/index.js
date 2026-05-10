@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux"
 
 import {
 	CloseCircleOutlined,
+	CloudDownloadOutlined,
 	DeleteOutlined,
 	DownloadOutlined,
 	EditOutlined,
@@ -28,12 +29,10 @@ import {
 	updateYears,
 } from "@market-slice/application/slices/settings.js"
 import {
-	Alert,
 	Button,
 	Card,
 	Checkbox,
 	Col,
-	Divider,
 	Input,
 	InputNumber,
 	List,
@@ -75,6 +74,21 @@ export function Settings() {
 		)
 		return () => clearTimeout(t)
 	}, [query])
+
+	const [catalogBrandsOpen, setCatalogBrandsOpen] = useState(false)
+	const [catalogBrandsLoading, setCatalogBrandsLoading] = useState(false)
+	const [catalogBrandsItems, setCatalogBrandsItems] = useState([])
+	const [catalogBrandsQuery, setCatalogBrandsQuery] = useState("")
+	const [catalogBrandsPick, setCatalogBrandsPick] = useState(() => new Set())
+
+	const [catalogModelsOpen, setCatalogModelsOpen] = useState(false)
+	const [catalogModelsLoading, setCatalogModelsLoading] = useState(false)
+	const [catalogModelsBrandId, setCatalogModelsBrandId] = useState("")
+	const [catalogModelsItems, setCatalogModelsItems] = useState([])
+	const [catalogModelsQuery, setCatalogModelsQuery] = useState("")
+	const [catalogModelsPick, setCatalogModelsPick] = useState(() => new Set())
+
+	const [modelsPanelBrandId, setModelsPanelBrandId] = useState(null)
 
 	const fileInputRef = useRef(null)
 
@@ -167,10 +181,22 @@ export function Settings() {
 		let newBrands = [...settings.brands]
 		if (editingBrand) {
 			newBrands = newBrands.map((b) =>
-				b === editingBrand ? { id, name, selected: Boolean(brandSelected) } : b,
+				b === editingBrand
+					? {
+							id,
+							name,
+							selected: Boolean(brandSelected),
+							models: Array.isArray(b.models) ? b.models : [],
+						}
+					: b,
 			)
 		} else {
-			newBrands.push({ id, name, selected: Boolean(brandSelected) })
+			newBrands.push({
+				id,
+				name,
+				selected: Boolean(brandSelected),
+				models: [],
+			})
 		}
 
 		dispatch(setSettings({ ...settings, brands: newBrands }))
@@ -250,6 +276,179 @@ export function Settings() {
 			return s.includes(debouncedQuery)
 		})
 	}, [settings.brands, debouncedQuery])
+
+	const filteredCatalogBrands = useMemo(() => {
+		const q = catalogBrandsQuery.trim().toLowerCase()
+		if (!q) return catalogBrandsItems
+		return catalogBrandsItems.filter(
+			(it) =>
+				String(it.name || "")
+					.toLowerCase()
+					.includes(q) ||
+				String(it.id || "")
+					.toLowerCase()
+					.includes(q),
+		)
+	}, [catalogBrandsItems, catalogBrandsQuery])
+
+	const filteredCatalogModels = useMemo(() => {
+		const q = catalogModelsQuery.trim().toLowerCase()
+		if (!q) return catalogModelsItems
+		return catalogModelsItems.filter(
+			(it) =>
+				String(it.name || "")
+					.toLowerCase()
+					.includes(q) ||
+				String(it.id || "")
+					.toLowerCase()
+					.includes(q),
+		)
+	}, [catalogModelsItems, catalogModelsQuery])
+
+	const openCatalogBrandsModal = async () => {
+		if (!electron?.fetchBrandsFromAutoRu) {
+			message.warning("Загрузка каталога доступна только в приложении Electron")
+			return
+		}
+		setCatalogBrandsOpen(true)
+		setCatalogBrandsQuery("")
+		setCatalogBrandsPick(new Set())
+		setCatalogBrandsItems([])
+		setCatalogBrandsLoading(true)
+		try {
+			const res = await electron.fetchBrandsFromAutoRu()
+			const items = Array.isArray(res?.items) ? res.items : []
+			setCatalogBrandsItems(items)
+			if (!res?.ok) {
+				message.warning(
+					res?.error
+						? `Не удалось загрузить каталог: ${res.error}. Показан запасной список.`
+						: "Показан запасной список брендов.",
+				)
+			}
+		} catch (e) {
+			console.error(e)
+			message.error("Ошибка загрузки брендов с auto.ru")
+		} finally {
+			setCatalogBrandsLoading(false)
+		}
+	}
+
+	const toggleCatalogBrandPick = (id) => {
+		setCatalogBrandsPick((prev) => {
+			const next = new Set(prev)
+			if (next.has(id)) next.delete(id)
+			else next.add(id)
+			return next
+		})
+	}
+
+	const applyCatalogBrands = () => {
+		const picked = catalogBrandsItems.filter((it) =>
+			catalogBrandsPick.has(it.id),
+		)
+		if (!picked.length) {
+			message.info("Выберите хотя бы один бренд")
+			return
+		}
+		const existingIds = new Set((settings.brands || []).map((b) => b.id))
+		let newBrands = [...(settings.brands || [])]
+		for (const it of picked) {
+			if (existingIds.has(it.id)) continue
+			existingIds.add(it.id)
+			newBrands.push({
+				id: it.id,
+				name: it.name || it.id,
+				selected: true,
+				models: [],
+			})
+		}
+		dispatch(setSettings({ ...settings, brands: newBrands }))
+		setCatalogBrandsOpen(false)
+		message.success("Бренды добавлены (не забудьте сохранить настройки)")
+	}
+
+	const openCatalogModelsModal = async (brand) => {
+		const bid = brand?.id
+		if (!bid) return
+		if (!electron?.fetchModelsFromAutoRu) {
+			message.warning("Загрузка моделей доступна только в приложении Electron")
+			return
+		}
+		setCatalogModelsBrandId(bid)
+		setCatalogModelsOpen(true)
+		setCatalogModelsQuery("")
+		setCatalogModelsPick(new Set())
+		setCatalogModelsItems([])
+		setCatalogModelsLoading(true)
+		try {
+			const res = await electron.fetchModelsFromAutoRu(bid)
+			const items = Array.isArray(res?.items) ? res.items : []
+			setCatalogModelsItems(items)
+			if (!res?.ok) {
+				message.warning(
+					res?.error
+						? `Не удалось загрузить модели: ${res.error}`
+						: "Не удалось загрузить модели.",
+				)
+			}
+		} catch (e) {
+			console.error(e)
+			message.error("Ошибка загрузки моделей с auto.ru")
+		} finally {
+			setCatalogModelsLoading(false)
+		}
+	}
+
+	const toggleCatalogModelPick = (id) => {
+		setCatalogModelsPick((prev) => {
+			const next = new Set(prev)
+			if (next.has(id)) next.delete(id)
+			else next.add(id)
+			return next
+		})
+	}
+
+	const applyCatalogModels = () => {
+		const bid = catalogModelsBrandId
+		const picked = catalogModelsItems.filter((it) =>
+			catalogModelsPick.has(it.id),
+		)
+		if (!picked.length) {
+			message.info("Выберите хотя бы одну модель")
+			return
+		}
+		const newBrands = (settings.brands || []).map((b) => {
+			if (b.id !== bid) return b
+			const byId = new Map((b.models || []).map((m) => [m.id, m]))
+			for (const p of picked) {
+				byId.set(p.id, { id: p.id, name: p.name || p.id })
+			}
+			return { ...b, models: [...byId.values()] }
+		})
+		dispatch(setSettings({ ...settings, brands: newBrands }))
+		setCatalogModelsOpen(false)
+		message.success("Модели добавлены к бренду")
+	}
+
+	const removeModelFromBrand = (brandId, modelId) => {
+		const newBrands = (settings.brands || []).map((b) => {
+			if (b.id !== brandId) return b
+			return {
+				...b,
+				models: (b.models || []).filter((m) => m.id !== modelId),
+			}
+		})
+		dispatch(setSettings({ ...settings, brands: newBrands }))
+	}
+
+	const clearBrandModels = (brandId) => {
+		const newBrands = (settings.brands || []).map((b) =>
+			b.id === brandId ? { ...b, models: [] } : b,
+		)
+		dispatch(setSettings({ ...settings, brands: newBrands }))
+		message.success("Список моделей очищен")
+	}
 
 	const selectedCount = (settings.brands || []).filter((b) => b.selected).length
 
@@ -488,102 +687,212 @@ export function Settings() {
 						grid={{ gutter: 8, column: 4 }}
 						dataSource={filteredBrands}
 						locale={{ emptyText: "Нет брендов по запросу" }}
-						renderItem={(brand) => (
-							<List.Item
-								style={{ padding: 0, margin: 0, borderBottom: "none" }}
-							>
-								<Card
-									size="small"
-									bordered={true}
-									bodyStyle={{
-										padding: 8,
-										display: "flex",
-										alignItems: "center",
-										gap: 8,
-										minHeight: 48,
-									}}
-									style={{
-										border: brand.selected
-											? "2px solid #1890ff"
-											: "1px solid #d9d9d9",
-										margin: 4,
-										boxSizing: "border-box",
-									}}
+						renderItem={(brand) => {
+							const modelCount = (brand.models || []).length
+							return (
+								<List.Item
+									style={{ padding: 0, margin: 0, borderBottom: "none" }}
 								>
-									<div style={{ flex: 1, minWidth: 0 }}>
+									<Card
+										size="small"
+										bordered={true}
+										bodyStyle={{
+											padding: 8,
+											display: "flex",
+											flexDirection: "column",
+											gap: 6,
+											minHeight: 48,
+										}}
+										style={{
+											border: brand.selected
+												? "2px solid #1890ff"
+												: "1px solid #d9d9d9",
+											margin: 4,
+											boxSizing: "border-box",
+										}}
+									>
 										<div
 											style={{
 												display: "flex",
-												alignItems: "center",
+												alignItems: "flex-start",
 												justifyContent: "space-between",
 												gap: 8,
 											}}
 										>
+											<div style={{ flex: 1, minWidth: 0 }}>
+												<div
+													style={{
+														display: "flex",
+														alignItems: "center",
+														gap: 8,
+													}}
+												>
+													<Checkbox
+														checked={brand.selected}
+														onChange={() => handleBrandToggle(brand.id)}
+														style={{ margin: 0, padding: 0 }}
+													/>
+													<strong style={{ display: "block" }}>
+														{brand.name}
+													</strong>
+													<span style={{ color: "#888", fontSize: 12 }}>
+														{brand.id}
+													</span>
+												</div>
+												<Text
+													type="secondary"
+													style={{
+														fontSize: 11,
+														display: "block",
+														marginTop: 4,
+													}}
+												>
+													{modelCount
+														? `Моделей в фильтре: ${modelCount}`
+														: "Все модели бренда"}
+												</Text>
+											</div>
 											<div
 												style={{
 													display: "flex",
 													alignItems: "center",
-													gap: 8,
+													gap: 6,
+													flexShrink: 0,
 												}}
 											>
-												<Checkbox
-													checked={brand.selected}
-													onChange={() => handleBrandToggle(brand.id)}
-													style={{ margin: 0, padding: 0 }}
-												/>
-
-												<strong style={{ display: "block" }}>
-													{brand.name}
-												</strong>
-												<span style={{ color: "#888", fontSize: 12 }}>
-													{brand.id}
-												</span>
+												<Tooltip title="Редактировать">
+													<Button
+														size="small"
+														icon={<EditOutlined />}
+														onClick={() => openEditModal(brand)}
+													/>
+												</Tooltip>
+												<Popconfirm
+													title={`Удалить бренд ${brand.name}?`}
+													onConfirm={() => handleDelete(brand)}
+													okText="Да"
+													cancelText="Нет"
+												>
+													<Tooltip title="Удалить">
+														<Button
+															size="small"
+															danger
+															icon={<DeleteOutlined />}
+														/>
+													</Tooltip>
+												</Popconfirm>
 											</div>
 										</div>
-									</div>
-									<div
-										style={{
-											display: "flex",
-											alignItems: "center",
-											gap: 6,
-											marginRight: 8,
-										}}
-									>
-										<Tooltip title="Редактировать">
+										<Space
+											wrap
+											size={4}
+										>
 											<Button
 												size="small"
-												icon={<EditOutlined />}
-												onClick={() => openEditModal(brand)}
-											/>
-										</Tooltip>
-										<Popconfirm
-											title={`Удалить бренд ${brand.name}?`}
-											onConfirm={() => handleDelete(brand)}
-											okText="Да"
-											cancelText="Нет"
-										>
-											<Tooltip title="Удалить">
-												<Button
-													size="small"
-													danger
-													icon={<DeleteOutlined />}
-												/>
-											</Tooltip>
-										</Popconfirm>
-									</div>
-								</Card>
-							</List.Item>
-						)}
+												type="link"
+												style={{ padding: 0, height: "auto" }}
+												onClick={() =>
+													setModelsPanelBrandId((cur) =>
+														cur === brand.id ? null : brand.id,
+													)
+												}
+											>
+												{modelsPanelBrandId === brand.id
+													? "Скрыть модели"
+													: "Модели…"}
+											</Button>
+										</Space>
+										{modelsPanelBrandId === brand.id ? (
+											<div
+												style={{
+													borderTop: "1px solid #f0f0f0",
+													paddingTop: 6,
+												}}
+											>
+												<Space
+													direction="vertical"
+													style={{ width: "100%" }}
+													size={6}
+												>
+													{(brand.models || []).length ? (
+														<List
+															size="small"
+															dataSource={brand.models || []}
+															locale={{ emptyText: "Нет моделей" }}
+															renderItem={(m) => (
+																<List.Item
+																	style={{ padding: "4px 0" }}
+																	actions={[
+																		<Button
+																			key="rm"
+																			size="small"
+																			type="link"
+																			danger
+																			onClick={() =>
+																				removeModelFromBrand(brand.id, m.id)
+																			}
+																		>
+																			Убрать
+																		</Button>,
+																	]}
+																>
+																	<span>{m.name}</span>{" "}
+																	<span style={{ color: "#888", fontSize: 11 }}>
+																		{m.id}
+																	</span>
+																</List.Item>
+															)}
+														/>
+													) : (
+														<Text type="secondary">
+															Список пуст — парсятся все модели
+														</Text>
+													)}
+													<Space wrap>
+														<Button
+															size="small"
+															icon={<CloudDownloadOutlined />}
+															onClick={() => openCatalogModelsModal(brand)}
+														>
+															Загрузить с auto.ru
+														</Button>
+														{modelCount ? (
+															<Popconfirm
+																title="Очистить список моделей для этого бренда?"
+																onConfirm={() => clearBrandModels(brand.id)}
+																okText="Да"
+																cancelText="Нет"
+															>
+																<Button size="small">Очистить фильтр</Button>
+															</Popconfirm>
+														) : null}
+													</Space>
+												</Space>
+											</div>
+										) : null}
+									</Card>
+								</List.Item>
+							)
+						}}
 					/>
 				</Space>
 			</Card>
 
-			<Space style={{ width: "100%", justifyContent: "flex-start" }}>
+			<Space
+				style={{ width: "100%", justifyContent: "flex-start" }}
+				wrap
+			>
 				<Button
 					icon={<PlusOutlined />}
 					onClick={openAddModal}
 				>
 					Добавить бренд
+				</Button>
+				<Button
+					icon={<CloudDownloadOutlined />}
+					onClick={openCatalogBrandsModal}
+				>
+					Загрузить бренды с auto.ru
 				</Button>
 				<Button
 					type="primary"
@@ -619,6 +928,125 @@ export function Settings() {
 						onChange={(e) => setNewCityId(e.target.value)}
 						placeholder="например: vladivostok"
 					/>
+				</Space>
+			</Modal>
+
+			<Modal
+				title="Бренды с auto.ru"
+				open={catalogBrandsOpen}
+				onCancel={() => setCatalogBrandsOpen(false)}
+				width={720}
+				footer={[
+					<Button
+						key="close"
+						onClick={() => setCatalogBrandsOpen(false)}
+					>
+						Закрыть
+					</Button>,
+					<Button
+						key="add"
+						type="primary"
+						loading={catalogBrandsLoading}
+						onClick={applyCatalogBrands}
+					>
+						Добавить выбранные
+					</Button>,
+				]}
+			>
+				<Space
+					direction="vertical"
+					style={{ width: "100%" }}
+					size="middle"
+				>
+					<Search
+						placeholder="Поиск по названию или id"
+						value={catalogBrandsQuery}
+						onChange={(e) => setCatalogBrandsQuery(e.target.value)}
+						allowClear
+					/>
+					{catalogBrandsLoading && !catalogBrandsItems.length ? (
+						<Text type="secondary">Загрузка…</Text>
+					) : null}
+					<div style={{ maxHeight: 420, overflow: "auto" }}>
+						<List
+							size="small"
+							dataSource={filteredCatalogBrands}
+							locale={{
+								emptyText:
+									"Нет данных — попробуйте позже или добавьте бренд вручную",
+							}}
+							renderItem={(it) => (
+								<List.Item style={{ padding: "6px 0" }}>
+									<Checkbox
+										checked={catalogBrandsPick.has(it.id)}
+										onChange={() => toggleCatalogBrandPick(it.id)}
+									>
+										<strong>{it.name}</strong>{" "}
+										<span style={{ color: "#888", fontSize: 12 }}>{it.id}</span>
+									</Checkbox>
+								</List.Item>
+							)}
+						/>
+					</div>
+				</Space>
+			</Modal>
+
+			<Modal
+				title={`Модели: ${catalogModelsBrandId}`}
+				open={catalogModelsOpen}
+				onCancel={() => setCatalogModelsOpen(false)}
+				width={640}
+				footer={[
+					<Button
+						key="c"
+						onClick={() => setCatalogModelsOpen(false)}
+					>
+						Отмена
+					</Button>,
+					<Button
+						key="ok"
+						type="primary"
+						loading={catalogModelsLoading}
+						onClick={applyCatalogModels}
+					>
+						Добавить выбранные к бренду
+					</Button>,
+				]}
+			>
+				<Space
+					direction="vertical"
+					style={{ width: "100%" }}
+					size="middle"
+				>
+					<Search
+						placeholder="Поиск по названию или id"
+						value={catalogModelsQuery}
+						onChange={(e) => setCatalogModelsQuery(e.target.value)}
+						allowClear
+					/>
+					{catalogModelsLoading && !catalogModelsItems.length ? (
+						<Text type="secondary">Загрузка…</Text>
+					) : null}
+					<div style={{ maxHeight: 400, overflow: "auto" }}>
+						<List
+							size="small"
+							dataSource={filteredCatalogModels}
+							locale={{
+								emptyText: "Модели не найдены — проверьте город и id бренда",
+							}}
+							renderItem={(it) => (
+								<List.Item style={{ padding: "6px 0" }}>
+									<Checkbox
+										checked={catalogModelsPick.has(it.id)}
+										onChange={() => toggleCatalogModelPick(it.id)}
+									>
+										<strong>{it.name}</strong>{" "}
+										<span style={{ color: "#888", fontSize: 12 }}>{it.id}</span>
+									</Checkbox>
+								</List.Item>
+							)}
+						/>
+					</div>
 				</Space>
 			</Modal>
 

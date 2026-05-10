@@ -253,6 +253,91 @@ export function computePerBrandAnalytics(report = []) {
 	return out
 }
 
+function positionKey(offer) {
+	return [
+		offer.brand,
+		offer.model,
+		offer.equipment,
+		offer.modification,
+		String(offer.year ?? ""),
+	].join("\u0000")
+}
+
+export function compareDealers(rowsFlat, baseDealer, otherDealers = []) {
+	const base = String(baseDealer || "").trim()
+	const others = [
+		...new Set(
+			otherDealers
+				.map((d) => String(d || "").trim())
+				.filter((d) => d && d !== "—" && d !== base),
+		),
+	]
+	if (!base || !others.length) {
+		return {
+			rows: [],
+			summary: null,
+		}
+	}
+
+	const byPos = new Map()
+	for (const r of rowsFlat) {
+		const key = positionKey(r)
+		if (!byPos.has(key)) byPos.set(key, {})
+		byPos.get(key)[r.dealer] = r
+	}
+
+	const rows = []
+	let baseCheaper = 0
+	let baseExpensive = 0
+	let ties = 0
+	let diffSum = 0
+	let pairCount = 0
+
+	for (const dealers of byPos.values()) {
+		const baseRow = dealers[base]
+		if (!baseRow || baseRow.price == null) continue
+		const bp = baseRow.price
+		for (const od of others) {
+			const otherRow = dealers[od]
+			if (!otherRow || otherRow.price == null) continue
+			const op = otherRow.price
+			const diffAbs = bp - op
+			const diffPct = op ? diffAbs / op : null
+			if (diffAbs < 0) baseCheaper++
+			else if (diffAbs > 0) baseExpensive++
+			else ties++
+			diffSum += diffAbs
+			pairCount++
+			rows.push({
+				key: `${positionKey(baseRow)}::${od}`,
+				brand: baseRow.brand,
+				model: baseRow.model,
+				equipment: baseRow.equipment,
+				modification: baseRow.modification,
+				year: baseRow.year,
+				baseDealer: base,
+				basePrice: bp,
+				otherDealer: od,
+				otherPrice: op,
+				diffAbs,
+				diffPct,
+			})
+		}
+	}
+
+	rows.sort((a, b) => Math.abs(b.diffAbs) - Math.abs(a.diffAbs))
+
+	const summary = {
+		baseCheaperCount: baseCheaper,
+		baseExpensiveCount: baseExpensive,
+		tieCount: ties,
+		avgDiffAbs: pairCount ? diffSum / pairCount : null,
+		comparedPairs: pairCount,
+	}
+
+	return { rows, summary }
+}
+
 export function generateComprehensiveAnalytics(report = []) {
 	const { rowsFlat, dealerCounts } = flattenReport(report)
 	const summary = computeSummary(rowsFlat)

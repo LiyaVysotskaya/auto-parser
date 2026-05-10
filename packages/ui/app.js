@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react"
 import { useDispatch } from "react-redux"
 import { RouterProvider, createMemoryRouter } from "react-router-dom"
 
+import { getDefaultSettings } from "@market-slice/application/settings/defaults.js"
 import { normalizeStoredSettings } from "@market-slice/application/settings/normalize.js"
 import { setSettings } from "@market-slice/application/slices/settings.js"
 import { App as AntdApp, ConfigProvider, theme } from "antd"
@@ -41,10 +42,12 @@ export function App() {
 				if (!electron?.getSettings) return
 				const saved = await electron.getSettings()
 				if (!mounted) return
-				const normalized = normalizeStoredSettings(saved)
-				if (normalized) dispatch(setSettings(normalized))
+				const normalized =
+					normalizeStoredSettings(saved) ?? getDefaultSettings()
+				dispatch(setSettings(normalized))
 			} catch {
-				/* userData или IPC недоступны — остаётся initialState */
+				if (!mounted) return
+				dispatch(setSettings(getDefaultSettings()))
 			}
 		})()
 		return () => {

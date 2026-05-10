@@ -1,7 +1,9 @@
-import React, { useMemo, useRef } from "react"
+import React, { useMemo, useRef, useState } from "react"
 import { useDispatch, useSelector } from "react-redux"
+import { useNavigate } from "react-router-dom"
 
 import {
+	BarChartOutlined,
 	DownloadOutlined,
 	PlayCircleOutlined,
 	StopOutlined,
@@ -16,7 +18,9 @@ import {
 	Card,
 	Col,
 	Divider,
+	Progress,
 	Row,
+	Segmented,
 	Space,
 	Statistic,
 	Tag,
@@ -41,14 +45,47 @@ function formatDuration(ms) {
 	return `${ss}s`
 }
 
+function statusColor(status) {
+	switch (status) {
+		case "pending":
+			return "processing"
+		case "success":
+			return "success"
+		case "failed":
+			return "error"
+		case "cancelled":
+			return "warning"
+		default:
+			return "default"
+	}
+}
+
+function statusBorder(status) {
+	switch (status) {
+		case "pending":
+			return "var(--ant-color-info-border)"
+		case "success":
+			return "var(--ant-color-success-border)"
+		case "failed":
+			return "var(--ant-color-error-border)"
+		case "cancelled":
+			return "var(--ant-color-warning-border)"
+		default:
+			return "var(--ant-color-border)"
+	}
+}
+
 export function AutoRu() {
 	const dispatch = useDispatch()
+	const navigate = useNavigate()
 	const uploadReportInputRef = useRef(null)
 	const autoRuState = useSelector((state) => state.autoRu)
 	const settings = useSelector((state) => state.settings)
 	const log = useSelector((state) =>
 		state.log.filter(({ scope }) => scope === "autoRu"),
 	)
+
+	const [logFilter, setLogFilter] = useState("all")
 
 	const selectedBrands = (settings.brands || []).filter((b) => b.selected)
 	const selectedCount = selectedBrands.length
@@ -78,6 +115,21 @@ export function AutoRu() {
 		: "—"
 	const lastDuration = formatDuration(last.durationMs)
 
+	const isPending = autoRuState.status === "pending"
+	const pagination = autoRuState.pagination
+	const progressPct =
+		isPending && pagination?.total_offers_count && autoRuState.count
+			? Math.min(
+					99,
+					Math.round((autoRuState.count / pagination.total_offers_count) * 100),
+				)
+			: 0
+
+	const filteredLog = useMemo(() => {
+		if (logFilter === "all") return log
+		return log.filter((r) => r.level === logFilter)
+	}, [log, logFilter])
+
 	return (
 		<Space
 			direction="vertical"
@@ -90,7 +142,12 @@ export function AutoRu() {
 				style={{ width: "100%" }}
 			>
 				<Col>
-					<Title level={4}>Панель управления</Title>
+					<Title
+						level={4}
+						style={{ margin: 0 }}
+					>
+						Панель управления
+					</Title>
 				</Col>
 				<Col>
 					<Space>
@@ -98,20 +155,18 @@ export function AutoRu() {
 							icon={<PlayCircleOutlined />}
 							type="primary"
 							onClick={() => electron?.autoRu()}
-							disabled={autoRuState.status === "pending"}
+							disabled={isPending}
 						>
 							Старт
 						</Button>
-
 						<Button
 							danger
 							icon={<StopOutlined />}
 							onClick={() => electron?.autoRuCancel?.()}
-							disabled={autoRuState.status !== "pending"}
+							disabled={!isPending}
 						>
 							Стоп
 						</Button>
-
 						<Button
 							icon={<DownloadOutlined />}
 							onClick={() => {
@@ -124,7 +179,6 @@ export function AutoRu() {
 						>
 							Скачать отчёт
 						</Button>
-
 						<input
 							ref={uploadReportInputRef}
 							type="file"
@@ -168,7 +222,29 @@ export function AutoRu() {
 				</Col>
 			</Row>
 
-			<Row gutter={16}>
+			{isPending && (
+				<Card size="small">
+					<Space
+						direction="vertical"
+						style={{ width: "100%" }}
+					>
+						<Text strong>Парсинг в процессе…</Text>
+						<Progress
+							percent={progressPct}
+							status="active"
+							strokeColor={{ from: "#108ee9", to: "#87d068" }}
+						/>
+						<Text type="secondary">
+							Собрано предложений: {autoRuState.count}
+							{pagination?.total_offers_count
+								? ` / ~${pagination.total_offers_count}`
+								: ""}
+						</Text>
+					</Space>
+				</Card>
+			)}
+
+			<Row gutter={[16, 16]}>
 				<Col
 					xs={24}
 					md={12}
@@ -177,6 +253,9 @@ export function AutoRu() {
 					<Card
 						title="Бренды для парсинга"
 						size="small"
+						style={{
+							borderTop: `3px solid ${statusBorder(autoRuState.status)}`,
+						}}
 					>
 						<div>
 							<strong>Выбрано:</strong> {selectedCount} из {totalBrands}
@@ -186,10 +265,10 @@ export function AutoRu() {
 								marginTop: 8,
 								display: "flex",
 								flexWrap: "wrap",
-								gap: 8,
+								gap: 4,
 							}}
 						>
-							{(settings.brands || []).map((b) => (
+							{(settings.brands || []).slice(0, 12).map((b) => (
 								<Tag
 									key={b.id}
 									color={b.selected ? "blue" : "default"}
@@ -197,6 +276,9 @@ export function AutoRu() {
 									{b.name}
 								</Tag>
 							))}
+							{(settings.brands || []).length > 12 && (
+								<Tag>+{settings.brands.length - 12}</Tag>
+							)}
 						</div>
 					</Card>
 				</Col>
@@ -209,6 +291,9 @@ export function AutoRu() {
 					<Card
 						title="Диапазон годов"
 						size="small"
+						style={{
+							borderTop: `3px solid ${statusBorder(autoRuState.status)}`,
+						}}
 					>
 						<Statistic
 							title="Годы"
@@ -225,25 +310,41 @@ export function AutoRu() {
 					<Card
 						title="Город парсинга"
 						size="small"
+						style={{
+							borderTop: `3px solid ${statusBorder(autoRuState.status)}`,
+						}}
 					>
 						<Statistic
 							title="Регион"
 							value={cityDisplay.name}
 						/>
-						<div style={{ marginTop: 8 }}>
-							<Text type="secondary">slug: {cityDisplay.slug}</Text>
-						</div>
+						<Text
+							type="secondary"
+							style={{ fontSize: 12 }}
+						>
+							slug: {cityDisplay.slug}
+						</Text>
 					</Card>
 				</Col>
 
 				<Col
 					xs={24}
-					md={24}
+					md={12}
 					lg={6}
 				>
 					<Card
 						title="Последний запуск"
 						size="small"
+						style={{
+							borderTop: `3px solid ${statusBorder(autoRuState.status)}`,
+						}}
+						extra={
+							autoRuState.status && (
+								<Tag color={statusColor(autoRuState.status)}>
+									{autoRuState.status}
+								</Tag>
+							)
+						}
 					>
 						<div>
 							<strong>Начало:</strong> {lastStart}
@@ -259,18 +360,50 @@ export function AutoRu() {
 				</Col>
 			</Row>
 
-			<Card title="Журнал (последние сообщения)">
-				<Space
-					direction="vertical"
-					style={{ width: "100%" }}
-				>
-					{log.length === 0 ? (
-						<Text type="secondary">Записи журнала отсутствуют</Text>
-					) : (
-						log
-							.slice(-8)
-							.reverse()
-							.map((r, i) => (
+			{reportRows > 0 && !isPending && (
+				<Card size="small">
+					<Space style={{ width: "100%", justifyContent: "space-between" }}>
+						<Text>
+							<strong>Последний отчёт:</strong> {reportSheets} брендов,{" "}
+							{reportRows} предложений
+						</Text>
+						<Button
+							type="link"
+							icon={<BarChartOutlined />}
+							onClick={() => navigate("/auto-ru/report")}
+						>
+							Перейти к аналитике
+						</Button>
+					</Space>
+				</Card>
+			)}
+
+			<Card
+				title="Журнал"
+				extra={
+					<Segmented
+						size="small"
+						value={logFilter}
+						onChange={setLogFilter}
+						options={[
+							{ value: "all", label: "Все" },
+							{ value: "info", label: "Info" },
+							{ value: "success", label: "Успех" },
+							{ value: "warning", label: "Внимание" },
+							{ value: "error", label: "Ошибки" },
+						]}
+					/>
+				}
+			>
+				<div style={{ maxHeight: 320, overflow: "auto" }}>
+					<Space
+						direction="vertical"
+						style={{ width: "100%" }}
+					>
+						{filteredLog.length === 0 ? (
+							<Text type="secondary">Записи журнала отсутствуют</Text>
+						) : (
+							filteredLog.slice(0, 30).map((r, i) => (
 								<Alert
 									key={i}
 									type={
@@ -278,14 +411,17 @@ export function AutoRu() {
 											? "error"
 											: r.level === "warning"
 												? "warning"
-												: "info"
+												: r.level === "success"
+													? "success"
+													: "info"
 									}
-									message={`${dateFns.format(new Date(r.timestamp), "HH:mm")} — ${r.message}`}
+									message={`${dateFns.format(new Date(r.timestamp), "HH:mm:ss")} — ${r.message}`}
 									showIcon
 								/>
 							))
-					)}
-				</Space>
+						)}
+					</Space>
+				</div>
 			</Card>
 		</Space>
 	)

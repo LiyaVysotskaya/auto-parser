@@ -29,7 +29,6 @@ import { TopListCard } from "./TopListCard.jsx"
 import { detailedColumns, topOfferColumns } from "./columns.jsx"
 
 const { Title, Text } = Typography
-const { Panel } = Collapse
 
 function BrandAnalyticsPanel({ brand, data }) {
 	if (!data) return null
@@ -138,10 +137,13 @@ function BrandAnalyticsPanel({ brand, data }) {
 												style={{ marginRight: 8 }}
 											/>
 											<b>{it.model}</b>
-											<div style={{ color: "#666", fontSize: 12 }}>
+											<Text
+												type="secondary"
+												style={{ fontSize: 12, display: "block" }}
+											>
 												{it.equipment} • дилер:{" "}
 												{it.priceMinDealer ?? it.minDealer ?? "—"}
-											</div>
+											</Text>
 										</div>
 										<div style={{ textAlign: "right" }}>
 											<Tag color="red">
@@ -154,12 +156,15 @@ function BrandAnalyticsPanel({ brand, data }) {
 													? Number(it.bestDiscountAbs).toLocaleString() + " ₽"
 													: "—"}
 											</div>
-											<div style={{ fontSize: 11, color: "#888" }}>
+											<Text
+												type="secondary"
+												style={{ fontSize: 11, display: "block" }}
+											>
 												итог:{" "}
 												{it.priceMin
 													? Number(it.priceMin).toLocaleString() + " ₽"
 													: "—"}
-											</div>
+											</Text>
 										</div>
 									</Space>
 								</List.Item>
@@ -233,7 +238,7 @@ export function AutoRuReport() {
 	}))
 
 	return (
-		<div style={{ padding: 16, background: "#f5f5f5", minHeight: "100vh" }}>
+		<div style={{ padding: 16, minHeight: "100vh" }}>
 			<Card style={{ marginBottom: 16 }}>
 				<Title
 					level={2}
@@ -319,26 +324,26 @@ export function AutoRuReport() {
 				{brandKeys.length === 0 ? (
 					<Text type="secondary">Нет данных</Text>
 				) : (
-					<Collapse defaultActiveKey={brandKeys.slice(0, 3)}>
-						{brandKeys.map((brand) => (
-							<Panel
-								header={
-									<Space>
-										<strong>{brand}</strong>
-										<Tag color="blue">
-											{perBrand[brand].models.length} моделей
-										</Tag>
-										<Tag color="green">
-											{perBrand[brand].models.reduce(
-												(sum, m) => sum + m.totalOffers,
-												0,
-											)}{" "}
-											предложений
-										</Tag>
-									</Space>
-								}
-								key={brand}
-							>
+					<Collapse
+						defaultActiveKey={brandKeys.slice(0, 3)}
+						items={brandKeys.map((brand) => ({
+							key: brand,
+							label: (
+								<Space>
+									<strong>{brand}</strong>
+									<Tag color="blue">
+										{perBrand[brand].models.length} моделей
+									</Tag>
+									<Tag color="green">
+										{perBrand[brand].models.reduce(
+											(sum, m) => sum + m.totalOffers,
+											0,
+										)}{" "}
+										предложений
+									</Tag>
+								</Space>
+							),
+							children: (
 								<Table
 									size="small"
 									columns={detailedColumns}
@@ -349,9 +354,9 @@ export function AutoRuReport() {
 									pagination={{ pageSize: 10, showSizeChanger: true }}
 									scroll={{ x: 800 }}
 								/>
-							</Panel>
-						))}
-					</Collapse>
+							),
+						}))}
+					/>
 				)}
 			</Card>
 

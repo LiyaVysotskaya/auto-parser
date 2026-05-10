@@ -1,4 +1,5 @@
 import React from "react"
+
 import { Badge, Tag, Tooltip, Typography } from "antd"
 
 import { money, pct } from "./report-formatters.js"
@@ -104,9 +105,9 @@ export const detailedColumns = [
 		render: (_v, rec) => (
 			<div>
 				<b>{rec.model}</b>
-				<div style={{ color: "#666", fontSize: 12 }}>
+				<Text type="secondary" style={{ fontSize: 12, display: "block" }}>
 					{rec.equipment} • {rec.modification} • {rec.year}
-				</div>
+				</Text>
 			</div>
 		),
 		fixed: "left",
@@ -170,7 +171,9 @@ export const detailedColumns = [
 		render: (v, r) => (
 			<div>
 				<Tag color={r.bestDiscountPct >= 0.1 ? "red" : "gold"}>{money(v)}</Tag>
-				<div style={{ fontSize: 11, color: "#666" }}>{pct(r.bestDiscountPct)}</div>
+				<Text type="secondary" style={{ fontSize: 11, display: "block" }}>
+					{pct(r.bestDiscountPct)}
+				</Text>
 			</div>
 		),
 	},

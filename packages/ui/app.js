@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react"
+import React, { useEffect } from "react"
 import { useDispatch } from "react-redux"
 import { RouterProvider, createMemoryRouter } from "react-router-dom"
 
@@ -10,30 +10,15 @@ import "normalize.css"
 
 import { electron } from "./electron.js"
 import { initialEntries, routes } from "./pages/index.js"
+import { ThemeProvider, useTheme } from "./theme-context.js"
 
 const router = createMemoryRouter(routes(), {
 	initialEntries,
 })
 
-export function App() {
+function AppInner() {
 	const dispatch = useDispatch()
-	const [darkMode, setDarkMode] = useState(false)
-	const windowQuery = window.matchMedia("(prefers-color-scheme:dark)")
-
-	const darkModeChange = useCallback((event) => {
-		setDarkMode(event.matches ? true : false)
-	}, [])
-
-	useEffect(() => {
-		windowQuery.addEventListener("change", darkModeChange)
-		return () => {
-			windowQuery.removeEventListener("change", darkModeChange)
-		}
-	}, [windowQuery, darkModeChange])
-
-	useEffect(() => {
-		setDarkMode(windowQuery.matches ? true : false)
-	}, [])
+	const { isDark } = useTheme()
 
 	useEffect(() => {
 		let mounted = true
@@ -55,15 +40,23 @@ export function App() {
 		}
 	}, [dispatch])
 
+	const algorithms = isDark
+		? [theme.darkAlgorithm, theme.compactAlgorithm]
+		: [theme.compactAlgorithm]
+
 	return (
-		<ConfigProvider
-			theme={{
-				algorithm: darkMode ? theme.darkAlgorithm : theme.compactAlgorithm,
-			}}
-		>
+		<ConfigProvider theme={{ algorithm: algorithms }}>
 			<AntdApp>
 				<RouterProvider router={router} />
 			</AntdApp>
 		</ConfigProvider>
+	)
+}
+
+export function App() {
+	return (
+		<ThemeProvider>
+			<AppInner />
+		</ThemeProvider>
 	)
 }

@@ -43,9 +43,9 @@ export function DealerComparison({ report = [] }) {
 			render: (_, r) => (
 				<div>
 					<b>{r.model}</b>
-					<div style={{ color: "#666", fontSize: 12 }}>
+					<Text type="secondary" style={{ fontSize: 12 }}>
 						{r.equipment} • {r.modification} • {r.year}
-					</div>
+					</Text>
 				</div>
 			),
 		},

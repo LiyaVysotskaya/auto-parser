@@ -13,14 +13,13 @@ import {
 	mergeCityOptions,
 	normalizeExtraCityEntry,
 } from "@market-slice/application/settings/defaults.js"
-import {
-	setSettings,
-	updateCity,
-} from "@market-slice/application/slices/settings.js"
+import { setSettings } from "@market-slice/application/slices/settings.js"
 import {
 	Button,
 	Card,
+	Checkbox,
 	Col,
+	Divider,
 	Input,
 	List,
 	Modal,
@@ -118,18 +117,42 @@ export function CitySettings() {
 		)
 		const nextCity =
 			settings.city === cityEntry.id ? DEFAULT_CITY_ID : settings.city
+		const cities = (settings.cities ?? []).filter((id) => id !== cityEntry.id)
+		const nextCities =
+			cities.length > 0 ? cities : [nextCity].filter(Boolean)
 		dispatch(
 			setSettings({
 				...settings,
 				extraCities: extra,
 				city: nextCity,
+				cities: nextCities,
 			}),
 		)
 		message.success("Город удалён")
 	}
 
 	const handleSelectCity = (cityId) => {
-		dispatch(updateCity(cityId))
+		const cur = settings.cities ?? [settings.city]
+		const nextCities = cur.includes(cityId) ? cur : [...cur, cityId]
+		dispatch(
+			setSettings({
+				...settings,
+				city: cityId,
+				cities: nextCities.length ? nextCities : [cityId],
+			}),
+		)
+	}
+
+	const parseCityValues = settings.cities?.length
+		? settings.cities
+		: [settings.city]
+
+	const onParseCitiesChange = (ids) => {
+		if (!ids.length) {
+			message.warning("Нужен хотя бы один город для парсинга")
+			return
+		}
+		dispatch(setSettings({ ...settings, cities: ids }))
 	}
 
 	return (
@@ -160,6 +183,29 @@ export function CitySettings() {
 					/>
 				</Col>
 			</Row>
+
+			<Divider style={{ margin: "12px 0" }} />
+
+			<Title level={5}>Города для парсинга</Title>
+			<Text type="secondary" style={{ display: "block", marginBottom: 8 }}>
+				Отметьте один или несколько регионов — сбор пройдёт по каждому по
+				очереди. В отчёте и истории у строк будет колонка «Город».
+			</Text>
+			<Checkbox.Group
+				style={{ width: "100%" }}
+				value={parseCityValues}
+				onChange={onParseCitiesChange}
+			>
+				<Row gutter={[8, 8]}>
+					{cityOptions.map((c) => (
+						<Col key={c.id}>
+							<Checkbox value={c.id}>{c.name}</Checkbox>
+						</Col>
+					))}
+				</Row>
+			</Checkbox.Group>
+
+			<Divider style={{ margin: "12px 0" }} />
 
 			<List
 				grid={{ gutter: 8, column: 4 }}

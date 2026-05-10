@@ -101,12 +101,18 @@ async function scrapeBrandYear(
 	)
 }
 
-async function finalizeRun(reportBuilder, callbacks, startMs, { cancelled }) {
+async function finalizeRun(
+	reportBuilder,
+	callbacks,
+	startMs,
+	{ cancelled, parseCities },
+) {
 	const {
 		onLastRun = noop,
 		onReport = noop,
 		onLog = noop,
 		onStatus = noop,
+		onPersistRun = noop,
 	} = callbacks
 
 	const finalReport = reportBuilder.finalize()
@@ -119,6 +125,22 @@ async function finalizeRun(reportBuilder, callbacks, startMs, { cancelled }) {
 	})
 
 	onReport(finalReport)
+
+	try {
+		await Promise.resolve(
+			onPersistRun({
+				report: finalReport,
+				startedMs: startMs,
+				finishedMs: endMs,
+				startedIso: new Date(startMs).toISOString(),
+				finishedIso: new Date(endMs).toISOString(),
+				cities: parseCities || [],
+				status: cancelled ? "cancelled" : "success",
+			}),
+		)
+	} catch (err) {
+		console.error("[auto-ru] onPersistRun failed:", err)
+	}
 
 	const filePath = await saveReport(finalReport)
 	console.log("[auto-ru] Report saved:", filePath)
@@ -169,68 +191,92 @@ export async function runAutoRu(options, callbacks = {}, signal) {
 		browser = await launchBrowser(options)
 		const page = await browser.newPage()
 
-		outer: for (const brandRun of options.brands) {
-			const mark =
-				typeof brandRun === "string" ? brandRun : String(brandRun?.id || "")
-			if (!mark) continue
-			const modelSlugs =
-				brandRun &&
-				typeof brandRun === "object" &&
-				Array.isArray(brandRun.models) &&
-				brandRun.models.length > 0
-					? brandRun.models
-							.map((x) => String(x).trim().toLowerCase())
-							.filter(Boolean)
-					: [null]
-			for (const modelSlug of modelSlugs) {
-				for (let year = options.years.from; year <= options.years.to; year++) {
-					if (signal?.aborted) {
-						cancelled = true
-						break outer
-					}
+		const parseCities = (() => {
+			if (Array.isArray(options.cities) && options.cities.length > 0) {
+				return [
+					...new Set(
+						options.cities.map((c) => String(c).trim()).filter(Boolean),
+					),
+				]
+			}
+			if (options.city) return [String(options.city).trim()].filter(Boolean)
+			return ["sankt-peterburg"]
+		})()
 
-					try {
-						onStatus("pending")
-						await scrapeBrandYear(
-							page,
-							mark,
-							year,
-							modelSlug,
-							options,
-							reportBuilder,
-							{ onOffer },
-							signal,
-						)
-					} catch (error) {
-						if (error?.name === "AbortError" || signal?.aborted) {
+		outer: for (const cityId of parseCities) {
+			reportBuilder.setCity(cityId)
+			const optionsForCity = { ...options, city: cityId }
+
+			for (const brandRun of optionsForCity.brands) {
+				const mark =
+					typeof brandRun === "string" ? brandRun : String(brandRun?.id || "")
+				if (!mark) continue
+				const modelSlugs =
+					brandRun &&
+					typeof brandRun === "object" &&
+					Array.isArray(brandRun.models) &&
+					brandRun.models.length > 0
+						? brandRun.models
+								.map((x) => String(x).trim().toLowerCase())
+								.filter(Boolean)
+						: [null]
+				for (const modelSlug of modelSlugs) {
+					for (
+						let year = optionsForCity.years.from;
+						year <= optionsForCity.years.to;
+						year++
+					) {
+						if (signal?.aborted) {
 							cancelled = true
 							break outer
 						}
-						console.error(
-							`[auto-ru] Error ${mark}${modelSlug ? `/${modelSlug}` : ""} ${year}:`,
-							error.message,
-						)
-					}
 
-					if (signal?.aborted) {
-						cancelled = true
-						break outer
-					}
+						try {
+							onStatus("pending")
+							await scrapeBrandYear(
+								page,
+								mark,
+								year,
+								modelSlug,
+								optionsForCity,
+								reportBuilder,
+								{ onOffer },
+								signal,
+							)
+						} catch (error) {
+							if (error?.name === "AbortError" || signal?.aborted) {
+								cancelled = true
+								break outer
+							}
+							console.error(
+								`[auto-ru] Error ${cityId} ${mark}${modelSlug ? `/${modelSlug}` : ""} ${year}:`,
+								error.message,
+							)
+						}
 
-					try {
-						await delay(DELAYS.betweenCombinations, signal)
-					} catch (error) {
-						if (error?.name === "AbortError" || signal?.aborted) {
+						if (signal?.aborted) {
 							cancelled = true
 							break outer
 						}
-						throw error
+
+						try {
+							await delay(DELAYS.betweenCombinations, signal)
+						} catch (error) {
+							if (error?.name === "AbortError" || signal?.aborted) {
+								cancelled = true
+								break outer
+							}
+							throw error
+						}
 					}
 				}
 			}
 		}
 
-		return await finalizeRun(reportBuilder, callbacks, startMs, { cancelled })
+		return await finalizeRun(reportBuilder, callbacks, startMs, {
+			cancelled,
+			parseCities,
+		})
 	} catch (error) {
 		console.error("[auto-ru] Fatal:", error)
 		const endMs = Date.now()

@@ -8,6 +8,7 @@ const COLUMNS = [
 	{ key: "year", title: "Год", width: 5 },
 	{ key: "count", title: "Склад", width: 5 },
 	{ key: "dealer", title: "Дилер", width: 35 },
+	{ key: "city", title: "Город", width: 18 },
 	{ key: "price", title: "Основная цена", width: 15 },
 	{ key: "priceMin", title: "Минимальная цена", width: 15 },
 	{ key: "secondPrice", title: "Вторая цена", width: 15 },
@@ -22,7 +23,13 @@ const COLUMNS = [
 
 const TITLE_TO_KEY = Object.fromEntries(COLUMNS.map((c) => [c.title, c.key]))
 
-const TEXT_KEYS = new Set(["model", "equipment", "modification", "dealer"])
+const TEXT_KEYS = new Set([
+	"model",
+	"equipment",
+	"modification",
+	"dealer",
+	"city",
+])
 
 const INTEGER_KEYS = new Set(["year", "count"])
 

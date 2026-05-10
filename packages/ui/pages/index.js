@@ -2,12 +2,14 @@ import React from "react"
 
 import {
 	DashboardOutlined,
+	LineChartOutlined,
 	SettingOutlined,
 	TableOutlined,
 } from "@ant-design/icons"
 import _ from "lodash"
 
 import { Layout } from "../layout.js"
+import { PriceHistory } from "./auto-ru/PriceHistory.jsx"
 import { AutoRu } from "./auto-ru/index.js"
 import { AutoRuReport } from "./auto-ru/report.js"
 import { Settings } from "./settings/index.js"
@@ -31,6 +33,12 @@ export const pages = [
 						element: <AutoRuReport />,
 						icon: <TableOutlined />,
 						label: "Отчет",
+					},
+					{
+						path: "price-history",
+						element: <PriceHistory />,
+						icon: <LineChartOutlined />,
+						label: "История цен",
 					},
 					{
 						path: "settings",

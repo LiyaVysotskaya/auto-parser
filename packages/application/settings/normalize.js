@@ -1,8 +1,10 @@
 import {
+	DEFAULT_CITY_ID,
 	DEFAULT_YEARS,
 	getDefaultSettings,
 	isAllowedCityId,
 	isKnownCityId,
+	mergeCityOptions,
 	normalizeExtraCityEntry,
 } from "./defaults.js"
 
@@ -51,6 +53,27 @@ function dedupeExtraCities(entries) {
 	return out
 }
 
+function normalizeParseCities(rawCities, primaryCity, extraCities) {
+	const allowedSet = new Set(mergeCityOptions(extraCities).map((c) => c.id))
+	const primary = allowedSet.has(primaryCity) ? primaryCity : DEFAULT_CITY_ID
+	const base =
+		Array.isArray(rawCities) && rawCities.length > 0 ? rawCities : [primary]
+	const cleaned = [
+		...new Set(
+			base
+				.map((id) => String(id ?? "").trim())
+				.filter((id) => id && allowedSet.has(id)),
+		),
+	]
+	return cleaned.length > 0 ? cleaned : [primary]
+}
+
+export function getParseCityIds(settings) {
+	const n = normalizeSettingsOrDefault(settings)
+	if (Array.isArray(n.cities) && n.cities.length > 0) return [...n.cities]
+	return [n.city]
+}
+
 export function normalizeStoredSettings(saved) {
 	if (!saved || !Array.isArray(saved.brands)) return null
 	const defaults = getDefaultSettings()
@@ -64,11 +87,13 @@ export function normalizeStoredSettings(saved) {
 	const city = isAllowedCityId(saved.city, extraCities)
 		? saved.city
 		: defaults.city
+	const cities = normalizeParseCities(saved.cities, city, extraCities)
 	return {
 		...saved,
 		brands: saved.brands.filter(Boolean).map(normalizeBrand),
 		years: saved.years ?? { ...DEFAULT_YEARS },
 		city,
+		cities,
 		extraCities,
 	}
 }

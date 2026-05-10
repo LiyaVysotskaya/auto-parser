@@ -5,13 +5,15 @@ export { fetchCatalogBrands, fetchCatalogModels } from "./catalog-fetch.js"
 export { buildLaunchOptions, launchBrowser } from "./browser.js"
 export { saveReport } from "./file-export.js"
 export { runAutoRu } from "./orchestrator.js"
+export { flattenReport } from "./flatten-report.js"
 export {
 	DEFAULT_YEARS,
 	getDefaultBrandCatalog,
-	getSelectedBrandIds,
-	getSelectedBrandRuns,
 	getDefaultBrandIds,
 	getDefaultSettings,
+	getParseCityIds,
+	getSelectedBrandIds,
+	getSelectedBrandRuns,
 	loadSettings,
 	loadSettingsSync,
 	normalizeSettingsOrDefault,

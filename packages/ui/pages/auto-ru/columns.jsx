@@ -95,6 +95,14 @@ export const topOfferColumns = [
 		ellipsis: true,
 		render: (dealer) => <Text copyable>{dealer}</Text>,
 	},
+	{
+		title: "Город",
+		dataIndex: "city",
+		key: "city",
+		width: 100,
+		ellipsis: true,
+		render: (city) => (city && city !== "—" ? <Tag>{city}</Tag> : "—"),
+	},
 ]
 
 export const detailedColumns = [
@@ -177,17 +185,25 @@ export const detailedColumns = [
 			</div>
 		),
 	},
-	{
-		title: "Предложений",
-		dataIndex: "totalOffers",
-		key: "totalOffers",
-		width: 90,
-		align: "center",
-		render: (count) => (
-			<Badge
-				count={count}
-				style={{ backgroundColor: "#52c41a" }}
-			/>
-		),
-	},
-]
+		{
+			title: "Предложений",
+			dataIndex: "totalOffers",
+			key: "totalOffers",
+			width: 90,
+			align: "center",
+			render: (count) => (
+				<Badge
+					count={count}
+					style={{ backgroundColor: "#52c41a" }}
+				/>
+			),
+		},
+		{
+			title: "Город",
+			dataIndex: "city",
+			key: "city",
+			width: 100,
+			ellipsis: true,
+			render: (city) => (city && city !== "—" ? <Tag>{city}</Tag> : "—"),
+		},
+	]

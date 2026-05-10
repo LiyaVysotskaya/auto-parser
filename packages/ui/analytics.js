@@ -1,58 +1,7 @@
-function parseNumberLoose(v) {
-	if (v == null) return null
-	if (typeof v === "number") return v
-	const s = String(v).trim()
-	if (s === "") return null
-	let cleaned = s.replace(/\s+/g, "").replace(/[^0-9,.\-]/g, "")
-	if (cleaned.indexOf(",") >= 0 && cleaned.indexOf(".") === -1) {
-		cleaned = cleaned.replace(",", ".")
-	}
-	const n = Number(cleaned)
-	return Number.isFinite(n) ? n : null
-}
-
-function parseQty(v) {
-	const n = parseNumberLoose(v)
-	if (n == null) return 1
-	return Math.max(0, Math.floor(n))
-}
+import { flattenReport as flattenReportFromApp } from "../application/lib/flatten-report.js"
 
 export function flattenReport(report = []) {
-	const rowsFlat = []
-	const dealerCounts = {}
-
-	for (const tab of report) {
-		const brand = tab.name || "Unknown"
-		for (const r of tab.rows || []) {
-			const qty = parseQty(r.count ?? r.stock ?? r.quantity)
-			const price = parseNumberLoose(r.price)
-			const priceMin = parseNumberLoose(r.priceMin)
-			const secondPrice = parseNumberLoose(r.secondPrice)
-			const maxDiscountAbs = parseNumberLoose(r.maxDiscount) || 0
-
-			const offer = {
-				brand,
-				model: r.model || "—",
-				equipment: r.equipment || "—",
-				modification: r.modification || "—",
-				year: r.year || "—",
-				count: qty,
-				dealer: r.dealer || "—",
-				price: price != null ? price : null,
-				priceMin: priceMin != null ? priceMin : null,
-				secondPrice: secondPrice != null ? secondPrice : null,
-				maxDiscount: maxDiscountAbs,
-				tradeInDiscount: parseNumberLoose(r.tradeInDiscount) || 0,
-				creditDiscount: parseNumberLoose(r.creditDiscount) || 0,
-				insuranceDiscount: parseNumberLoose(r.insuranceDiscount) || 0,
-			}
-
-			rowsFlat.push(offer)
-			dealerCounts[offer.dealer] = (dealerCounts[offer.dealer] || 0) + qty
-		}
-	}
-
-	return { rowsFlat, dealerCounts }
+	return flattenReportFromApp(report)
 }
 
 export function computeSummary(rowsFlat) {
@@ -115,7 +64,7 @@ export function computeTopLists(rowsFlat, dealerCounts) {
 export function groupByModel(rowsFlat) {
 	const groups = {}
 	for (const r of rowsFlat) {
-		const key = `${r.brand}||${r.model}||${r.equipment}||${r.modification}||${r.year}`
+		const key = `${r.brand}||${r.model}||${r.equipment}||${r.modification}||${r.year}||${r.city || "—"}`
 		groups[key] = groups[key] || {
 			meta: {
 				brand: r.brand,
@@ -123,6 +72,7 @@ export function groupByModel(rowsFlat) {
 				equipment: r.equipment,
 				modification: r.modification,
 				year: r.year,
+				city: r.city || "—",
 			},
 			rows: [],
 		}
@@ -167,6 +117,7 @@ export function groupByModel(rowsFlat) {
 			equipment: g.meta.equipment,
 			modification: g.meta.modification,
 			year: g.meta.year,
+			city: g.meta.city,
 			totalOffers: totalUnitsInGroup,
 			minPrice: min?.price ?? null,
 			minDealer: min?.dealer ?? null,
@@ -260,6 +211,7 @@ function positionKey(offer) {
 		offer.equipment,
 		offer.modification,
 		String(offer.year ?? ""),
+		String(offer.city ?? "—"),
 	].join("\u0000")
 }
 
@@ -315,6 +267,7 @@ export function compareDealers(rowsFlat, baseDealer, otherDealers = []) {
 				equipment: baseRow.equipment,
 				modification: baseRow.modification,
 				year: baseRow.year,
+				city: baseRow.city,
 				baseDealer: base,
 				basePrice: bp,
 				otherDealer: od,
@@ -387,4 +340,99 @@ export function generateComprehensiveAnalytics(report = []) {
 		perModelSummary,
 		perBrandAnalytics,
 	}
+}
+
+export function offerHistoryKey(o) {
+	return [
+		o.brand,
+		o.model,
+		o.equipment || "—",
+		o.modification || "—",
+		String(o.year ?? ""),
+		o.dealer || "—",
+		o.city || "—",
+	].join("\u0000")
+}
+
+function pickOfferSummary(o) {
+	return {
+		brand: o.brand,
+		model: o.model,
+		equipment: o.equipment,
+		modification: o.modification,
+		year: o.year,
+		city: o.city,
+		dealer: o.dealer,
+	}
+}
+
+/** Сравнение двух плоских списков предложений (например из двух XLSX). */
+export function diffFlattenedOffers(rowsA, rowsB) {
+	const mapA = new Map()
+	for (const row of rowsA) mapA.set(offerHistoryKey(row), row)
+	const mapB = new Map()
+	for (const row of rowsB) mapB.set(offerHistoryKey(row), row)
+	const rows = []
+	const keys = new Set([...mapA.keys(), ...mapB.keys()])
+	for (const k of keys) {
+		const ra = mapA.get(k)
+		const rb = mapB.get(k)
+		if (ra && !rb) {
+			rows.push({
+				key: k,
+				change: "removed",
+				...pickOfferSummary(ra),
+				priceA: ra.price,
+				priceB: null,
+				pct: null,
+			})
+			continue
+		}
+		if (!ra && rb) {
+			rows.push({
+				key: k,
+				change: "added",
+				...pickOfferSummary(rb),
+				priceA: null,
+				priceB: rb.price,
+				pct: null,
+			})
+			continue
+		}
+		const pa = ra.price
+		const pb = rb.price
+		if (pa == null && pb == null) {
+			rows.push({
+				key: k,
+				change: "unchanged",
+				...pickOfferSummary(ra),
+				priceA: pa,
+				priceB: pb,
+				pct: null,
+			})
+			continue
+		}
+		if (pa === pb || (pa != null && pb != null && Math.abs(pa - pb) < 0.5)) {
+			rows.push({
+				key: k,
+				change: "unchanged",
+				...pickOfferSummary(ra),
+				priceA: pa,
+				priceB: pb,
+				pct: 0,
+			})
+			continue
+		}
+		const pct = pa && pb ? (pb - pa) / pa : null
+		rows.push({
+			key: k,
+			change: "price",
+			...pickOfferSummary(ra),
+			priceA: pa,
+			priceB: pb,
+			pct,
+		})
+	}
+	const ord = { added: 0, removed: 1, price: 2, unchanged: 3 }
+	return rows.sort((x, y) => (ord[x.change] ?? 9) - (ord[y.change] ?? 9))
 }

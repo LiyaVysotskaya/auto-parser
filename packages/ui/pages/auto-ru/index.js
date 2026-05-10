@@ -30,6 +30,7 @@ import {
 import * as dateFns from "date-fns"
 import * as XLSX from "xlsx"
 
+import { flattenReport } from "../../analytics.js"
 import { electron } from "../../electron.js"
 
 const { Text, Title } = Typography
@@ -81,6 +82,7 @@ export function AutoRu() {
 	const uploadReportInputRef = useRef(null)
 	const autoRuState = useSelector((state) => state.autoRu)
 	const settings = useSelector((state) => state.settings)
+	const favorites = useSelector((state) => state.favorites.items)
 	const log = useSelector((state) =>
 		state.log.filter(({ scope }) => scope === "autoRu"),
 	)
@@ -103,6 +105,32 @@ export function AutoRu() {
 	}, [settings.city, settings.extraCities])
 
 	const report = autoRuState.report || []
+
+	const parseCitiesLabel = useMemo(() => {
+		const ids = settings.cities?.length > 0 ? settings.cities : [settings.city]
+		const opts = mergeCityOptions(settings.extraCities ?? [])
+		return ids.map((id) => opts.find((c) => c.id === id)?.name || id).join(", ")
+	}, [settings.cities, settings.city, settings.extraCities])
+
+	const favoriteSnapshots = useMemo(() => {
+		const { rowsFlat } = flattenReport(report)
+		return (favorites || []).map((f) => {
+			const matches = rowsFlat.filter(
+				(r) =>
+					r.brand === f.brand &&
+					r.model === f.model &&
+					String(r.equipment ?? "—") === String(f.equipment ?? "—") &&
+					String(r.modification ?? "—") === String(f.modification ?? "—") &&
+					String(r.year ?? "—") === String(f.year ?? "—"),
+			)
+			const priced = matches.filter((r) => r.price != null)
+			const best = priced.length
+				? priced.reduce((a, b) => (a.price <= b.price ? a : b))
+				: null
+			return { f, best }
+		})
+	}, [favorites, report])
+
 	const reportSheets = report.length
 	let reportRows = 0
 	for (const t of report) {
@@ -308,21 +336,21 @@ export function AutoRu() {
 					lg={6}
 				>
 					<Card
-						title="Город парсинга"
+						title="Города парсинга"
 						size="small"
 						style={{
 							borderTop: `3px solid ${statusBorder(autoRuState.status)}`,
 						}}
 					>
 						<Statistic
-							title="Регион"
-							value={cityDisplay.name}
+							title="Регионы"
+							value={parseCitiesLabel}
 						/>
 						<Text
 							type="secondary"
-							style={{ fontSize: 12 }}
+							style={{ fontSize: 12, display: "block", marginTop: 4 }}
 						>
-							slug: {cityDisplay.slug}
+							Основной (каталог): {cityDisplay.name} ({cityDisplay.slug})
 						</Text>
 					</Card>
 				</Col>
@@ -377,6 +405,76 @@ export function AutoRu() {
 					</Space>
 				</Card>
 			)}
+
+			{favoriteSnapshots.length > 0 ? (
+				<Card
+					title="Избранное"
+					size="small"
+				>
+					<Text
+						type="secondary"
+						style={{ display: "block", marginBottom: 12 }}
+					>
+						Цены из текущего отчёта в памяти (минимум по дилерам для позиции).
+						Добавляйте звёздочкой на странице «Отчёт».
+					</Text>
+					<Row gutter={[12, 12]}>
+						{favoriteSnapshots.map(({ f, best }) => (
+							<Col
+								xs={24}
+								sm={12}
+								md={8}
+								key={`${f.brand}-${f.model}-${f.equipment}-${f.modification}-${f.year}`}
+							>
+								<Card
+									size="small"
+									bordered
+								>
+									<div>
+										<strong>
+											{f.brand} {f.model}
+										</strong>
+									</div>
+									<Text
+										type="secondary"
+										style={{ fontSize: 12, display: "block" }}
+									>
+										{f.equipment} • {f.modification} • {f.year}
+									</Text>
+									{best ? (
+										<>
+											<Statistic
+												title="Мин. цена"
+												value={Math.round(best.price)}
+												suffix="₽"
+												style={{ marginTop: 8 }}
+											/>
+											{best.city && best.city !== "—" ? (
+												<Tag style={{ marginTop: 8 }}>{best.city}</Tag>
+											) : null}
+											{best.dealer ? (
+												<Text
+													type="secondary"
+													style={{ fontSize: 11, display: "block" }}
+												>
+													{best.dealer}
+												</Text>
+											) : null}
+										</>
+									) : (
+										<Text
+											type="secondary"
+											style={{ marginTop: 8, display: "block" }}
+										>
+											Нет в текущем отчёте
+										</Text>
+									)}
+								</Card>
+							</Col>
+						))}
+					</Row>
+				</Card>
+			) : null}
 
 			<Card
 				title="Журнал"

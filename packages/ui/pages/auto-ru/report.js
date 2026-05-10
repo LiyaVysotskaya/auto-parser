@@ -25,6 +25,7 @@ import {
 
 import { generateComprehensiveAnalytics } from "../../analytics.js"
 import { DealerComparison } from "./DealerComparison.jsx"
+import { FavoriteStar } from "./FavoriteStar.jsx"
 import { TopListCard } from "./TopListCard.jsx"
 import { detailedColumns, topOfferColumns } from "./columns.jsx"
 
@@ -217,6 +218,19 @@ function BrandAnalyticsPanel({ brand, data }) {
 
 export function AutoRuReport() {
 	const report = useSelector((state) => state.autoRu.report || [])
+	const detailedWithFavorite = useMemo(
+		() => [
+			{
+				title: "",
+				key: "fav",
+				width: 44,
+				fixed: "left",
+				render: (_, rec) => <FavoriteStar row={rec} />,
+			},
+			...detailedColumns,
+		],
+		[],
+	)
 	const analytics = useMemo(
 		() => generateComprehensiveAnalytics(report),
 		[report],
@@ -252,8 +266,7 @@ export function AutoRuReport() {
 					style={{ display: "block", marginBottom: 16 }}
 				>
 					Сводка ниже — по всему отчёту. Топы по цене, скидкам и дилерам
-					считаются отдельно внутри каждого бренда, чтобы сравнение было
-					корректным.
+					считаются отдельно внутри каждого бренда.
 				</Text>
 
 				<Row gutter={16}>
@@ -346,10 +359,10 @@ export function AutoRuReport() {
 							children: (
 								<Table
 									size="small"
-									columns={detailedColumns}
+									columns={detailedWithFavorite}
 									dataSource={perBrand[brand].models}
 									rowKey={(r) =>
-										`${r.brand}::${r.model}::${r.equipment}::${r.year}`
+										`${r.brand}::${r.model}::${r.equipment}::${r.modification}::${r.year}::${r.city || "—"}`
 									}
 									pagination={{ pageSize: 10, showSizeChanger: true }}
 									scroll={{ x: 800 }}

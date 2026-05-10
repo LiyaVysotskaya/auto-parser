@@ -19,14 +19,18 @@ function dispatchCallbacks() {
 	}
 }
 
-export async function action(options = getConfig().autoRu) {
+export async function action(options = getConfig().autoRu, hooks = {}) {
 	const controller = new AbortController()
 	currentAbortController?.abort()
 	currentAbortController = controller
 	const signal = controller.signal
 
 	try {
-		return await runAutoRu(options, dispatchCallbacks(), signal)
+		return await runAutoRu(
+			options,
+			{ ...dispatchCallbacks(), ...hooks },
+			signal,
+		)
 	} finally {
 		if (currentAbortController === controller) {
 			currentAbortController = null

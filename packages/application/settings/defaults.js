@@ -82,6 +82,7 @@ export function getDefaultSettings() {
 		})),
 		years: { ...DEFAULT_YEARS },
 		city: DEFAULT_CITY_ID,
+		cities: [DEFAULT_CITY_ID],
 		extraCities: [],
 	}
 }

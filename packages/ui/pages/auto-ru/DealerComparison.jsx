@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react"
 
-import { Card, Select, Space, Table, Tag, Typography } from "antd"
+import { Button, Card, Select, Space, Table, Tag, Typography } from "antd"
 
 import { compareDealers, flattenReport } from "../../analytics.js"
 import { money, pct } from "./report-formatters.js"
@@ -45,6 +45,7 @@ export function DealerComparison({ report = [] }) {
 					<b>{r.model}</b>
 					<Text type="secondary" style={{ fontSize: 12 }}>
 						{r.equipment} • {r.modification} • {r.year}
+						{r.city && r.city !== "—" ? ` • ${r.city}` : ""}
 					</Text>
 				</div>
 			),
@@ -145,7 +146,18 @@ export function DealerComparison({ report = [] }) {
 					</div>
 					<div>
 						<div style={{ marginBottom: 4 }}>
-							<Text type="secondary">Сравнить с</Text>
+							<Space>
+								<Text type="secondary">Сравнить с</Text>
+								<Button
+									size="small"
+									type="link"
+									disabled={!baseDealer || !otherOptions.length}
+									onClick={() => setOtherDealers(otherOptions)}
+									style={{ padding: 0, height: "auto" }}
+								>
+									Выбрать всех
+								</Button>
+							</Space>
 						</div>
 						<Select
 							mode="multiple"

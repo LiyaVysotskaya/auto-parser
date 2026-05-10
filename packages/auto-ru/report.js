@@ -12,12 +12,18 @@ function rowGroupKey(groupKey) {
 		groupKey.modification,
 		String(groupKey.year),
 		groupKey.dealer,
+		String(groupKey.city ?? ""),
 	].join("\u0000")
 }
 
 export class ReportBuilder {
 	constructor() {
 		this._tabsByName = new Map()
+		this._city = ""
+	}
+
+	setCity(cityId) {
+		this._city = cityId != null ? String(cityId).trim() : ""
 	}
 
 	snapshot() {
@@ -44,6 +50,7 @@ export class ReportBuilder {
 			modification: safeGet(offer, "vehicle_info.tech_param.human_name", ""),
 			year: safeGet(offer, "documents.year", 0),
 			dealer: safeGet(offer, "salon.name", ""),
+			city: this._city || "—",
 		}
 
 		const rKey = rowGroupKey(groupKey)

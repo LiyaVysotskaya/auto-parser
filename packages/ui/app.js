@@ -4,6 +4,7 @@ import { RouterProvider, createMemoryRouter } from "react-router-dom"
 
 import { getDefaultSettings } from "@market-slice/application/settings/defaults.js"
 import { normalizeStoredSettings } from "@market-slice/application/settings/normalize.js"
+import { setFavorites } from "@market-slice/application/slices/favorites.js"
 import { setSettings } from "@market-slice/application/slices/settings.js"
 import { App as AntdApp, ConfigProvider, theme } from "antd"
 import "normalize.css"
@@ -30,6 +31,10 @@ function AppInner() {
 				const normalized =
 					normalizeStoredSettings(saved) ?? getDefaultSettings()
 				dispatch(setSettings(normalized))
+				if (electron?.favoritesList) {
+					const fav = await electron.favoritesList()
+					if (mounted && fav?.ok) dispatch(setFavorites(fav.items || []))
+				}
 			} catch {
 				if (!mounted) return
 				dispatch(setSettings(getDefaultSettings()))

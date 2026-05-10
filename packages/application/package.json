@@ -4,6 +4,7 @@
 	"bin": "./index.js",
 	"exports": {
 		".": "./lib/index.js",
+		"./lib/flatten-report.js": "./lib/flatten-report.js",
 		"./settings": "./settings/index.js",
 		"./settings/*": "./settings/*",
 		"./store": "./store.js",

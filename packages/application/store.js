@@ -1,10 +1,11 @@
 import { configureStore } from "@reduxjs/toolkit"
 
 import * as autoRu from "./slices/auto-ru.js"
+import * as favorites from "./slices/favorites.js"
 import * as log from "./slices/log.js"
 import * as settings from "./slices/settings.js"
 
-export { autoRu, log, settings }
+export { autoRu, favorites, log, settings }
 
 const actionListeners = new Set()
 
@@ -25,6 +26,7 @@ export function createStore() {
 	return configureStore({
 		reducer: {
 			autoRu: autoRu.slice.reducer,
+			favorites: favorites.slice.reducer,
 			log: log.slice.reducer,
 			settings: settings.slice.reducer,
 		},

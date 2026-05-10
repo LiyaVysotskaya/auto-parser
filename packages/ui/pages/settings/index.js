@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux"
 
 import {
 	CalendarOutlined,
+	DeleteOutlined,
 	DownloadOutlined,
 	EnvironmentOutlined,
 	ReloadOutlined,
@@ -15,12 +16,14 @@ import {
 	reset,
 	setSettings,
 } from "@market-slice/application/slices/settings.js"
-import { Button, Card, Space, Tabs, message } from "antd"
+import { Button, Card, Modal, Space, Tabs, Typography, message } from "antd"
 
 import { electron } from "../../electron.js"
 import { BrandSettings } from "./BrandSettings.jsx"
 import { CitySettings } from "./CitySettings.jsx"
 import { YearsSettings } from "./YearsSettings.jsx"
+
+const { Text } = Typography
 
 export function Settings() {
 	const dispatch = useDispatch()
@@ -35,6 +38,7 @@ export function Settings() {
 				brands: settings.brands,
 				years: settings.years,
 				city: settings.city,
+				cities: settings.cities?.length ? settings.cities : [settings.city],
 				extraCities: settings.extraCities ?? [],
 			}
 			if (electron?.saveSettings) {
@@ -69,6 +73,7 @@ export function Settings() {
 				brands: settings.brands,
 				years: settings.years,
 				city: settings.city,
+				cities: settings.cities?.length ? settings.cities : [settings.city],
 				extraCities: settings.extraCities ?? [],
 			}
 			const data = JSON.stringify(payload, null, 2)
@@ -195,6 +200,33 @@ export function Settings() {
 				>
 					Сбросить
 				</Button>
+				{electron?.priceHistoryClear ? (
+					<Button
+						danger
+						icon={<DeleteOutlined />}
+						onClick={() => {
+							Modal.confirm({
+								title: "Очистить историю цен?",
+								content: (
+									<Text type="secondary">
+										Будут удалены все сохранённые запуски и строки из локальной
+										базы. Избранное не затрагивается. Действие необратимо.
+									</Text>
+								),
+								okText: "Очистить",
+								okType: "danger",
+								cancelText: "Отмена",
+								async onOk() {
+									const res = await electron.priceHistoryClear()
+									if (res?.ok) message.success("История очищена")
+									else message.error(res?.error || "Не удалось очистить")
+								},
+							})
+						}}
+					>
+						Очистить историю цен
+					</Button>
+				) : null}
 			</Space>
 		</Space>
 	)

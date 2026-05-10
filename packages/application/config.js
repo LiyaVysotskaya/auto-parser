@@ -5,8 +5,10 @@ import path from "path"
 import { fileURLToPath } from "url"
 
 import {
+	getParseCityIds,
 	getSelectedBrandRuns,
 	loadSettingsSync,
+	normalizeSettingsOrDefault,
 	saveSettingsSync,
 } from "./settings/index.js"
 
@@ -14,11 +16,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const settingsPath = path.join(__dirname, "..", "..", "auto-ru-settings.json")
 
 function loadSettings() {
-	const settings = loadSettingsSync(settingsPath)
+	const raw = loadSettingsSync(settingsPath)
+	const settings = normalizeSettingsOrDefault(raw)
 	return {
 		brands: getSelectedBrandRuns(settings),
 		years: settings.years,
 		city: settings.city,
+		cities: getParseCityIds(settings),
 	}
 }
 
@@ -34,6 +38,7 @@ const config = {
 		},
 		url: listingUrl,
 		city: settings.city,
+		cities: settings.cities,
 		brands: settings.brands,
 		years: settings.years,
 	},

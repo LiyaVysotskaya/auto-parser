@@ -3,6 +3,7 @@ const fs = require("node:fs/promises")
 
 const {
 	autoRu,
+	cancelAutoRu,
 	getDefaultSettings,
 	getSelectedBrandIds,
 	loadSettings,
@@ -55,6 +56,10 @@ function registerIpcHandlers({ app, ipcMain }) {
 		"..",
 		"auto-ru-settings.json",
 	)
+
+	ipcMain.on("autoRu:cancel", () => {
+		cancelAutoRu()
+	})
 
 	ipcMain.on("autoRu", async () => {
 		try {

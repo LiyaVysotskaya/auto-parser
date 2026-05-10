@@ -1,3 +1,3 @@
-export { init, offers } from "./scraper.js"
-export { END_OF_REPORT, report } from "./report.js"
+export { init, offers, TIMEOUTS } from "./scraper.js"
+export { ReportBuilder, createReport } from "./report.js"
 export { reportName, xlsx } from "./xlsx.js"

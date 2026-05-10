@@ -5,23 +5,37 @@ const safeGet = (obj, path, defaultValue = "") => {
 	return value === null || value === undefined ? defaultValue : value
 }
 
-export const END_OF_REPORT = Symbol()
+function rowGroupKey(groupKey) {
+	return [
+		groupKey.model,
+		groupKey.equipment,
+		groupKey.modification,
+		String(groupKey.year),
+		groupKey.dealer,
+	].join("\u0000")
+}
 
-export function* report() {
-	const result = []
+export class ReportBuilder {
+	constructor() {
+		this._tabsByName = new Map()
+	}
 
-	let reportState = yield result
+	snapshot() {
+		return [...this._tabsByName.values()].map((tab) => ({
+			name: tab.name,
+			rows: tab.rows,
+		}))
+	}
 
-	while (reportState !== END_OF_REPORT) {
-		const offer = reportState
-		if (!offer || offer === END_OF_REPORT) break
+	add(offer) {
+		if (!offer) return
 
 		const mark = safeGet(offer, "vehicle_info.mark_info.name", "Unknown")
 
-		let tab = result.find((t) => t.name === mark)
+		let tab = this._tabsByName.get(mark)
 		if (!tab) {
-			tab = { name: mark, rows: [] }
-			result.push(tab)
+			tab = { name: mark, rows: [], rowsByKey: new Map() }
+			this._tabsByName.set(mark, tab)
 		}
 
 		const groupKey = {
@@ -32,14 +46,8 @@ export function* report() {
 			dealer: safeGet(offer, "salon.name", ""),
 		}
 
-		let row = tab.rows.find(
-			(r) =>
-				r.model === groupKey.model &&
-				r.equipment === groupKey.equipment &&
-				r.modification === groupKey.modification &&
-				r.year === groupKey.year &&
-				r.dealer === groupKey.dealer,
-		)
+		const rKey = rowGroupKey(groupKey)
+		let row = tab.rowsByKey.get(rKey)
 
 		if (!row) {
 			row = {
@@ -57,6 +65,7 @@ export function* report() {
 				insuranceDiscount: null,
 			}
 			tab.rows.push(row)
+			tab.rowsByKey.set(rKey, row)
 		}
 
 		row.count++
@@ -88,22 +97,30 @@ export function* report() {
 				safeGet(offer, "discount_options.insurance", null),
 			)
 		}
-
-		reportState = yield result
 	}
 
-	for (const tab of result) {
-		tab.rows.sort(
-			(a, b) =>
-				a.model.localeCompare(b.model) ||
-				a.equipment.localeCompare(b.equipment) ||
-				a.modification.localeCompare(b.modification) ||
-				a.year - b.year ||
-				a.dealer.localeCompare(b.dealer),
-		)
+	finalize() {
+		const result = [...this._tabsByName.values()].map((tab) => ({
+			name: tab.name,
+			rows: [...tab.rows],
+		}))
+
+		for (const tab of result) {
+			tab.rows.sort(
+				(a, b) =>
+					a.model.localeCompare(b.model) ||
+					a.equipment.localeCompare(b.equipment) ||
+					a.modification.localeCompare(b.modification) ||
+					a.year - b.year ||
+					a.dealer.localeCompare(b.dealer),
+			)
+		}
+
+		result.sort((a, b) => a.name.localeCompare(b.name))
+		return result
 	}
+}
 
-	result.sort((a, b) => a.name.localeCompare(b.name))
-
-	return result
+export function createReport() {
+	return new ReportBuilder()
 }

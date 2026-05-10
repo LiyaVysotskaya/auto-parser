@@ -3,7 +3,7 @@ import path from "node:path"
 import puppeteer from "puppeteer-extra"
 import stealth from "puppeteer-extra-plugin-stealth"
 
-puppeteer.use(stealth())
+let stealthApplied = false
 
 export function buildLaunchOptions(effectiveOptions) {
 	const { browser: browserOpts = {}, headless, userDataDir } = effectiveOptions
@@ -17,5 +17,9 @@ export function buildLaunchOptions(effectiveOptions) {
 }
 
 export function launchBrowser(effectiveOptions) {
+	if (!stealthApplied) {
+		puppeteer.use(stealth())
+		stealthApplied = true
+	}
 	return puppeteer.launch(buildLaunchOptions(effectiveOptions))
 }

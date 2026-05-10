@@ -1,48 +1,47 @@
 import * as dateFns from "date-fns"
 import * as XLSX from "xlsx"
 
+const COLUMNS = [
+	{ key: "model", title: "Модель", width: 25 },
+	{ key: "equipment", title: "Комплектация", width: 25 },
+	{ key: "modification", title: "Модификация", width: 45 },
+	{ key: "year", title: "Год", width: 5 },
+	{ key: "count", title: "Склад", width: 5 },
+	{ key: "dealer", title: "Дилер", width: 35 },
+	{ key: "price", title: "Основная цена", width: 15 },
+	{ key: "priceMin", title: "Минимальная цена", width: 15 },
+	{ key: "secondPrice", title: "Вторая цена", width: 15 },
+	{ key: "specialistsProposal", title: "Предложение специалиста", width: 15 },
+	{ key: "REKCProposal", title: "Предложение РЕКЦ", width: 15 },
+	{ key: "agreedPrice", title: "Согласованная цена", width: 15 },
+	{ key: "maxDiscount", title: "Максимально возможная скидка", width: 15 },
+	{ key: "tradeInDiscount", title: "Скидка Trade-In", width: 15 },
+	{ key: "creditDiscount", title: "Скидка за кредит", width: 15 },
+	{ key: "insuranceDiscount", title: "Скидка КАСКО", width: 15 },
+]
+
+function columnWidths() {
+	return COLUMNS.map((c) => ({ wch: c.width }))
+}
+
 export function xlsx(report) {
 	const workbook = XLSX.utils.book_new()
-	const headers = [
-		[{ key: "model", title: "Модель" }, { wch: 25 }],
-		[{ key: "equipment", title: "Комплектация" }, { wch: 25 }],
-		[{ key: "modification", title: "Модификация" }, { wch: 45 }],
-		[{ key: "year", title: "Год" }, { wch: 5 }],
-		[{ key: "count", title: "Склад" }, { wch: 5 }],
-		[{ key: "dealer", title: "Дилер" }, { wch: 35 }],
-		[{ key: "price", title: "Основная цена" }, { wch: 15 }],
-		[{ key: "priceMin", title: "Минимальная цена" }, { wch: 15 }],
-		[{ key: "secondPrice", title: "Вторая цена" }, { wch: 15 }],
-		[
-			{ key: "specialistsProposal", title: "Предложение специалиста" },
-			{ wch: 15 },
-		],
-		[{ key: "REKCProposal", title: "Предложение РЕКЦ" }, { wch: 15 }],
-		[{ key: "agreedPrice", title: "Согласованная цена" }, { wch: 15 }],
-		[
-			{ key: "maxDiscount", title: "Максимально возможная скидка" },
-			{ wch: 15 },
-		],
-		[{ key: "tradeInDiscount", title: "Скидка Trade-In" }, { wch: 15 }],
-		[{ key: "creditDiscount", title: "Скидка за кредит" }, { wch: 15 }],
-		[{ key: "insuranceDiscount", title: "Скидка КАСКО" }, { wch: 15 }],
-	]
 
 	for (const tab of report) {
 		const aoa = [
-			headers.map(([{ title }]) => title),
+			COLUMNS.map((c) => c.title),
 			...tab.rows.map((row) =>
-				headers.map(([{ key }]) => row[key ?? ""] ?? undefined),
+				COLUMNS.map((c) => row[c.key ?? ""] ?? undefined),
 			),
 		]
 		const ws = XLSX.utils.aoa_to_sheet(aoa)
-		ws["!cols"] = headers.map(([, obj]) => obj)
+		ws["!cols"] = columnWidths()
 		XLSX.utils.book_append_sheet(workbook, ws, tab.name)
 	}
 
 	if (!report.length) {
-		const ws = XLSX.utils.aoa_to_sheet([headers.map(([{ title }]) => title)])
-		ws["!cols"] = headers.map(([, obj]) => obj)
+		const ws = XLSX.utils.aoa_to_sheet([COLUMNS.map((c) => c.title)])
+		ws["!cols"] = columnWidths()
 		XLSX.utils.book_append_sheet(workbook, ws)
 	}
 

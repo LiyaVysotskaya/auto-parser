@@ -66,26 +66,6 @@ export function Settings() {
 
 	const fileInputRef = useRef(null)
 
-	useEffect(() => {
-		let mounted = true
-		async function load() {
-			try {
-				if (electron?.getSettings) {
-					const saved = await electron.getSettings()
-					if (!mounted) return
-					const normalized = normalizeStoredSettings(saved)
-					if (normalized) dispatch(setSettings(normalized))
-				}
-			} catch (err) {
-				// noop
-			}
-		}
-		load()
-		return () => {
-			mounted = false
-		}
-	}, [dispatch])
-
 	const handleBrandToggle = (brandId) => {
 		dispatch(toggleBrand(brandId))
 	}

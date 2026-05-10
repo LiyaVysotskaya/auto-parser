@@ -118,6 +118,7 @@ function formatStatus(status) {
 		status === "info" && chalk.bgBlue(chalk.white(" Информация ")),
 		status === "pending" && chalk.bgWhite(chalk.black(" В процессе ")),
 		status === "success" && chalk.bgGreen(chalk.white(" Успех ")),
+		status === "cancelled" && chalk.bgYellow(chalk.black(" Остановлено ")),
 		status === "warning" && chalk.yellow(chalk.black(" Предупреждение ")),
 		["failed", "error"].includes(status) &&
 			chalk.bgRed(chalk.white(" Ошибка ")),

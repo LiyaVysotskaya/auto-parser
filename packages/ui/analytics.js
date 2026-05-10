@@ -17,14 +17,9 @@ function parseQty(v) {
 	return Math.max(0, Math.floor(n))
 }
 
-export function generateComprehensiveAnalytics(report = []) {
+export function flattenReport(report = []) {
 	const rowsFlat = []
 	const dealerCounts = {}
-	let totalUnits = 0
-	let totalPriceSum = 0
-	let totalPriceUnits = 0
-	let minPrice = Infinity
-	let maxDiscount = 0
 
 	for (const tab of report) {
 		const brand = tab.name || "Unknown"
@@ -54,27 +49,51 @@ export function generateComprehensiveAnalytics(report = []) {
 
 			rowsFlat.push(offer)
 			dealerCounts[offer.dealer] = (dealerCounts[offer.dealer] || 0) + qty
-
-			if (offer.price !== null) {
-				totalUnits += qty
-				totalPriceSum += offer.price * qty
-				totalPriceUnits += qty
-				if (offer.price < minPrice) minPrice = offer.price
-			}
-
-			if (offer.maxDiscount > maxDiscount) maxDiscount = offer.maxDiscount
 		}
 	}
 
+	return { rowsFlat, dealerCounts }
+}
+
+export function computeSummary(rowsFlat) {
+	let totalUnits = 0
+	let totalPriceSum = 0
+	let totalPriceUnits = 0
+	let minPrice = Infinity
+	let maxDiscount = 0
+
+	for (const offer of rowsFlat) {
+		const qty = offer.count || 0
+		if (offer.price !== null) {
+			totalUnits += qty
+			totalPriceSum += offer.price * qty
+			totalPriceUnits += qty
+			if (offer.price < minPrice) minPrice = offer.price
+		}
+		if (offer.maxDiscount > maxDiscount) maxDiscount = offer.maxDiscount
+	}
+
 	const avgPrice = totalPriceUnits > 0 ? totalPriceSum / totalPriceUnits : 0
+
+	return {
+		totalOffers: totalUnits,
+		avgPrice,
+		minPrice: minPrice === Infinity ? 0 : minPrice,
+		maxDiscount,
+	}
+}
+
+export function computeTopLists(rowsFlat, dealerCounts) {
 	const topCheapest = [...rowsFlat]
 		.filter((o) => o.price != null)
 		.sort((a, b) => a.price - b.price)
 		.slice(0, 15)
+
 	const topDiscounts = [...rowsFlat]
 		.filter((o) => o.maxDiscount > 0)
 		.sort((a, b) => b.maxDiscount - a.maxDiscount)
 		.slice(0, 15)
+
 	const topValue = [...rowsFlat]
 		.filter((o) => o.price != null && o.maxDiscount > 0)
 		.map((o) => ({
@@ -84,11 +103,16 @@ export function generateComprehensiveAnalytics(report = []) {
 		}))
 		.sort((a, b) => b.discountRatio - a.discountRatio)
 		.slice(0, 15)
+
 	const topDealers = Object.entries(dealerCounts)
 		.map(([dealer, units]) => ({ dealer, units }))
 		.sort((a, b) => b.units - a.units)
 		.slice(0, 10)
 
+	return { topCheapest, topDiscounts, topValue, topDealers }
+}
+
+export function groupByModel(rowsFlat) {
 	const groups = {}
 	for (const r of rowsFlat) {
 		const key = `${r.brand}||${r.model}||${r.equipment}||${r.modification}||${r.year}`
@@ -160,6 +184,36 @@ export function generateComprehensiveAnalytics(report = []) {
 		}
 	})
 
+	return perModelSummary
+}
+
+export function groupByBrand(perModelSummary) {
+	const perBrand = {}
+	for (const row of perModelSummary) {
+		perBrand[row.brand] = perBrand[row.brand] || { models: [] }
+		perBrand[row.brand].models.push(row)
+	}
+	for (const b of Object.keys(perBrand)) {
+		perBrand[b].models.sort((a, b) => {
+			if (a.minPrice == null && b.minPrice == null) return 0
+			if (a.minPrice == null) return 1
+			if (b.minPrice == null) return -1
+			return a.minPrice - b.minPrice
+		})
+	}
+	return perBrand
+}
+
+export function generateComprehensiveAnalytics(report = []) {
+	const { rowsFlat, dealerCounts } = flattenReport(report)
+	const summary = computeSummary(rowsFlat)
+	const { topCheapest, topDiscounts, topValue, topDealers } = computeTopLists(
+		rowsFlat,
+		dealerCounts,
+	)
+	const perModelSummary = groupByModel(rowsFlat)
+	const perBrand = groupByBrand(perModelSummary)
+
 	const topModelsByPct = perModelSummary
 		.filter((m) => m.bestDiscountPct != null)
 		.map((m) => ({
@@ -185,27 +239,8 @@ export function generateComprehensiveAnalytics(report = []) {
 		.slice(0, 10)
 		.map((item) => ({ ...item, topDealer: item.minDealer || "—" }))
 
-	const perBrand = {}
-	for (const row of perModelSummary) {
-		perBrand[row.brand] = perBrand[row.brand] || { models: [] }
-		perBrand[row.brand].models.push(row)
-	}
-	for (const b of Object.keys(perBrand)) {
-		perBrand[b].models.sort((a, b) => {
-			if (a.minPrice == null && b.minPrice == null) return 0
-			if (a.minPrice == null) return 1
-			if (b.minPrice == null) return -1
-			return a.minPrice - b.minPrice
-		})
-	}
-
 	return {
-		summary: {
-			totalOffers: totalUnits,
-			avgPrice,
-			minPrice: minPrice === Infinity ? 0 : minPrice,
-			maxDiscount,
-		},
+		summary,
 		topCheapest,
 		topDiscounts,
 		topValue,

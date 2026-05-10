@@ -16,4 +16,5 @@ export {
 	saveSettings,
 	saveSettingsSync,
 } from "../settings/index.js"
+export { cancelAutoRu } from "./auto-ru.js"
 export { store, autoRu }

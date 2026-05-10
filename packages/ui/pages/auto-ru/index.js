@@ -1,7 +1,11 @@
 import React from "react"
 import { useSelector } from "react-redux"
 
-import { DownloadOutlined, PlayCircleOutlined } from "@ant-design/icons"
+import {
+	DownloadOutlined,
+	PlayCircleOutlined,
+	StopOutlined,
+} from "@ant-design/icons"
 import * as autoRuTools from "@market-slice/auto-ru"
 import {
 	Alert,
@@ -82,6 +86,15 @@ export function AutoRu() {
 							disabled={autoRuState.status === "pending"}
 						>
 							Старт
+						</Button>
+
+						<Button
+							danger
+							icon={<StopOutlined />}
+							onClick={() => electron?.autoRuCancel?.()}
+							disabled={autoRuState.status !== "pending"}
+						>
+							Стоп
 						</Button>
 
 						<Button

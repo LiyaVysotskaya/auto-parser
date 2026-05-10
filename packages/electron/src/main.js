@@ -1,7 +1,13 @@
 import _ from "lodash"
 
 const { app, BrowserWindow, ipcMain } = require("electron")
-const { store, autoRu } = require("@market-slice/application")
+const {
+	DEFAULT_YEARS,
+	store,
+	autoRu,
+	getDefaultBrandIds,
+	getDefaultSettings,
+} = require("@market-slice/application")
 const { takeEvery } = require("redux-saga/effects")
 
 const path = require("node:path")
@@ -42,7 +48,7 @@ const createWindow = () => {
 			}
 
 			let brands = []
-			let years = { from: 2023, to: 2025 }
+			let years = { ...DEFAULT_YEARS }
 			if (saved && Array.isArray(saved.brands)) {
 				brands = saved.brands
 					.filter((b) => b && b.selected === true)
@@ -73,19 +79,7 @@ const createWindow = () => {
 					console.warn(
 						"Нет проектного settings файла, используем полный набор брендов",
 					)
-					brands = [
-						"exeed",
-						"geely",
-						"haval",
-						"chery",
-						"omoda",
-						"jaecoo",
-						"belgee",
-						"jetour",
-						"aito",
-						"seres",
-						"tenet",
-					]
+					brands = getDefaultBrandIds()
 				}
 			}
 
@@ -128,22 +122,7 @@ const createWindow = () => {
 			const data = await fs.readFile(settingsPath, "utf-8")
 			return JSON.parse(data)
 		} catch (error) {
-			return {
-				brands: [
-					{ id: "exeed", name: "Exeed", selected: true },
-					{ id: "geely", name: "Geely", selected: true },
-					{ id: "haval", name: "Haval", selected: true },
-					{ id: "chery", name: "Chery", selected: true },
-					{ id: "omoda", name: "Omoda", selected: true },
-					{ id: "jaecoo", name: "Jaecoo", selected: true },
-					{ id: "belgee", name: "Belgee", selected: false },
-					{ id: "jetour", name: "Jetour", selected: false },
-					{ id: "aito", name: "Aito", selected: false },
-					{ id: "seres", name: "Seres", selected: false },
-					{ id: "tenet", name: "Tenet", selected: false },
-				],
-				years: { from: 2023, to: 2025 },
-			}
+			return getDefaultSettings()
 		}
 	})
 

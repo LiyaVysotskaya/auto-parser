@@ -1,22 +1,9 @@
 import { createSlice } from "@reduxjs/toolkit"
 import _ from "lodash"
 
-const initialState = {
-	brands: [
-		{ id: "exeed", name: "Exeed", selected: true },
-		{ id: "geely", name: "Geely", selected: true },
-		{ id: "haval", name: "Haval", selected: true },
-		{ id: "chery", name: "Chery", selected: true },
-		{ id: "omoda", name: "Omoda", selected: true },
-		{ id: "jaecoo", name: "Jaecoo", selected: true },
-		{ id: "belgee", name: "Belgee", selected: true },
-		{ id: "jetour", name: "Jetour", selected: true },
-		{ id: "aito", name: "Aito", selected: true },
-		{ id: "seres", name: "Seres", selected: true },
-		{ id: "tenet", name: "Tenet", selected: true },
-	],
-	years: { from: 2023, to: 2025 },
-}
+import { getDefaultSettings } from "../settingsDefaults.js"
+
+const initialState = getDefaultSettings()
 
 export const slice = createSlice({
 	name: "settings",

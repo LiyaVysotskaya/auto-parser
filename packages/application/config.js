@@ -5,6 +5,8 @@ import fs from "fs"
 import path from "path"
 import { fileURLToPath } from "url"
 
+import { DEFAULT_YEARS, getDefaultBrandIds } from "./settingsDefaults.js"
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 function loadSettings() {
@@ -31,7 +33,7 @@ function loadSettings() {
 
 				return {
 					brands,
-					years: settings.years ?? { from: 2023, to: 2025 },
+					years: settings.years ?? { ...DEFAULT_YEARS },
 				}
 			}
 		}
@@ -43,20 +45,8 @@ function loadSettings() {
 	}
 
 	return {
-		brands: [
-			"exeed",
-			"geely",
-			"haval",
-			"chery",
-			"omoda",
-			"jaecoo",
-			"belgee",
-			"jetour",
-			"aito",
-			"seres",
-			"tenet",
-		],
-		years: { from: 2023, to: 2025 },
+		brands: getDefaultBrandIds(),
+		years: { ...DEFAULT_YEARS },
 	}
 }
 

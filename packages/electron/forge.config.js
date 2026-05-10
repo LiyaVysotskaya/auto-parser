@@ -42,16 +42,6 @@ module.exports = {
 			config: {},
 		},
 	],
-	publishers: [
-		{
-			name: "@electron-forge/publisher-electron-release-server",
-			config: {
-				baseUrl: process.env.ELECTRON_RELEASE_SERVER_BASE_URL,
-				username: process.env.ELECTRON_RELEASE_SERVER_USERNAME,
-				password: process.env.ELECTRON_RELEASE_SERVER_PASSWORD,
-			},
-		},
-	],
 	plugins: [
 		{
 			name: "@electron-forge/plugin-auto-unpack-natives",
@@ -61,8 +51,7 @@ module.exports = {
 			name: "@electron-forge/plugin-webpack",
 			config: {
 				mainConfig: "./webpack.main.config.js",
-				devContentSecurityPolicy:
-					"connect-src 'self' https://maximum.expert 'unsafe-eval'",
+				devContentSecurityPolicy: "connect-src 'self' 'unsafe-eval'",
 				port: 9000,
 				loggerPort: 9001,
 				renderer: {

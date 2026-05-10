@@ -1,13 +1,12 @@
 {
 	"name": "@market-slice/electron",
-	"version": "1.4.0",
+	"version": "1.5.0",
 	"description": "Десктопное приложение для получения среза рынка автомобилей",
 	"main": ".webpack/main",
 	"scripts": {
 		"start": "electron-forge start",
 		"package": "electron-forge package",
 		"make": "electron-forge make",
-		"publish": "electron-forge publish",
 		"lint": "echo \"No linting configured\"",
 		"test": "echo \"No test specified\""
 	},
@@ -23,7 +22,6 @@
 		"@electron-forge/plugin-auto-unpack-natives": "^7.4.0",
 		"@electron-forge/plugin-fuses": "^7.4.0",
 		"@electron-forge/plugin-webpack": "^7.4.0",
-		"@electron-forge/publisher-electron-release-server": "^7.4.0",
 		"@electron/fuses": "^1.8.0",
 		"@vercel/webpack-asset-relocator-loader": "1.7.3",
 		"babel-loader": "^9.1.3",

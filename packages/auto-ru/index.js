@@ -7,43 +7,98 @@ const safeGet = (obj, path, defaultValue = "") => {
 	return value === null || value === undefined ? defaultValue : value
 }
 
+const INIT_BUTTON_WAIT_MS = 45_000
+
 export async function init(page) {
 	try {
-		return await page.evaluate(() => {
-			return new Promise((resolve) => {
-				const noOffers = Array.from(document.querySelectorAll("button")).find(
-					(btn) => /Нет предложений/i.test(btn.textContent),
+		return await page.evaluate((timeoutMs) => {
+			function findShowOffersButton() {
+				const nodes = Array.from(
+					document.querySelectorAll("button, a, [role='button']"),
 				)
+				return nodes.find((el) => {
+					const t = (el.textContent || "").replace(/\s+/g, " ").trim()
+					if (!t || /нет\s+предложений/i.test(t)) return false
+					return /показать/i.test(t) && /предложен/i.test(t)
+				})
+			}
+
+			return new Promise((resolve) => {
+				let settled = false
+				const finish = (value) => {
+					if (settled) return
+					settled = true
+					resolve(value)
+				}
+
+				const tryClickShowOffers = () => {
+					const button = findShowOffersButton()
+					if (!button) return false
+					button.click()
+					finish(
+						parseInt(String(button.textContent || "").replace(/\D/g, ""), 10) ||
+							0,
+					)
+					return true
+				}
+
+				const noOffers = Array.from(
+					document.querySelectorAll("button, a, [role='button']"),
+				).find((el) => /нет\s+предложений/i.test(el.textContent || ""))
 				if (noOffers) {
-					resolve(0)
+					finish(0)
 					return
 				}
 
-				const observer = new MutationObserver(() => {
-					const button = Array.from(document.querySelectorAll("button")).find(
-						(btn) =>
-							/Показать[\w\s]+(предложение|предложения|предложений)/i.test(
-								btn.textContent,
-							),
-					)
-					if (button) {
+				if (tryClickShowOffers()) return
+
+				let observer = null
+				let pollId = null
+				const timer = window.setTimeout(() => {
+					observer?.disconnect()
+					if (pollId != null) window.clearInterval(pollId)
+					finish(0)
+				}, timeoutMs)
+
+				observer = new MutationObserver(() => {
+					if (tryClickShowOffers()) {
+						window.clearTimeout(timer)
+						if (pollId != null) window.clearInterval(pollId)
 						observer.disconnect()
-						button.click()
-						resolve(parseInt(button.textContent.replace(/\D/g, "")) || 0)
 					}
 				})
 
 				observer.observe(document.body, { childList: true, subtree: true })
+
+				pollId = window.setInterval(() => {
+					if (tryClickShowOffers()) {
+						window.clearTimeout(timer)
+						if (pollId != null) window.clearInterval(pollId)
+						pollId = null
+						observer.disconnect()
+					}
+				}, 250)
 			})
-		})
+		}, INIT_BUTTON_WAIT_MS)
 	} catch (error) {
-		console.error("Init error:", error)
+		console.error("[auto-ru] init failed:", error)
 		return 0
 	}
 }
 
+/**
+ * One listing page forward (Auto.Ru shortcut). Avoid DOM heuristics global
+ * click — matched wrong controls and skipped pages.
+ */
+async function goToNextListingPage(page) {
+	await page.keyboard.down("ControlLeft")
+	await page.keyboard.press("ArrowRight")
+	await page.keyboard.up("ControlLeft")
+	await new Promise((r) => setTimeout(r, 450))
+}
+
 export async function* offers(page) {
-	const yielded = []
+	const yieldedIds = new Set()
 	let pagination = null
 
 	do {
@@ -56,7 +111,9 @@ export async function* offers(page) {
 				)
 				.then((res) => res.json())
 		} catch {
-			console.log("Запрос /listing/ не пришёл — переходим к следующему URL")
+			console.warn(
+				"[auto-ru] No /ajax/desktop-search/listing/ response (timeout); stop pagination.",
+			)
 			break
 		}
 
@@ -65,20 +122,25 @@ export async function* offers(page) {
 		}
 
 		for (const offer of response.offers) {
-			if (yielded.some((o) => o.id === offer.id)) continue
-			yielded.push(offer)
+			if (yieldedIds.has(offer.id)) continue
+			yieldedIds.add(offer.id)
 			yield { offer, pagination: response.pagination }
 		}
 
-		if (pagination && response.pagination.current <= pagination.current) {
+		if (
+			pagination &&
+			response.pagination &&
+			response.pagination.current <= pagination.current
+		) {
+			await new Promise((r) => setTimeout(r, 500))
 			continue
 		}
 		pagination = response.pagination
-		if (pagination.current >= pagination.total_page_count) return
+		if (!pagination || pagination.current >= pagination.total_page_count) {
+			return
+		}
 
-		await page.keyboard.down("ControlLeft")
-		await page.keyboard.press("ArrowRight")
-		await page.keyboard.up("ControlLeft")
+		await goToNextListingPage(page)
 	} while (true)
 }
 

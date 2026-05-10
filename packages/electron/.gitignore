@@ -90,3 +90,6 @@ typings/
 
 # Electron-Forge
 out/
+
+# Puppeteer user profile (main process)
+.browser/

@@ -13,7 +13,13 @@ import {
 	SelectOutlined,
 	UploadOutlined,
 } from "@ant-design/icons"
-import * as store from "@market-slice/application/store"
+import {
+	normalizeStoredSettings,
+	reset,
+	setSettings,
+	toggleBrand,
+	updateYears,
+} from "@market-slice/application/slices/settings.js"
 import {
 	Alert,
 	Button,
@@ -33,12 +39,6 @@ import {
 	message,
 } from "antd"
 
-import {
-	reset,
-	setSettings,
-	toggleBrand,
-	updateYears,
-} from "../../../application/slices/settings.js"
 import { electron } from "../../electron.js"
 
 const { Search } = Input
@@ -73,25 +73,8 @@ export function Settings() {
 				if (electron?.getSettings) {
 					const saved = await electron.getSettings()
 					if (!mounted) return
-					if (saved && saved.brands) {
-						const normalized = {
-							...saved,
-							brands: saved.brands.map((b) => {
-								if (typeof b === "string") {
-									const id = String(b).toLowerCase()
-									const name =
-										String(b).charAt(0).toUpperCase() + String(b).slice(1)
-									return { id, name, selected: true }
-								}
-								return {
-									id: b.id ?? String(b.name ?? "").toLowerCase(),
-									name: b.name ?? (b.id ? String(b.id).toUpperCase() : ""),
-									selected: typeof b.selected === "boolean" ? b.selected : true,
-								}
-							}),
-						}
-						dispatch(setSettings(normalized))
-					}
+					const normalized = normalizeStoredSettings(saved)
+					if (normalized) dispatch(setSettings(normalized))
 				}
 			} catch (err) {
 				// noop

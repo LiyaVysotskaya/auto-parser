@@ -18,5 +18,3 @@ export const instance = configureStore({
 	middleware: (getDefaultMiddleware) =>
 		getDefaultMiddleware({}).concat(sagaMiddleware),
 })
-
-sagaMiddleware.run(autoRu.saga)

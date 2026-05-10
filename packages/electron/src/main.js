@@ -91,6 +91,7 @@ const createWindow = () => {
 					executablePath:
 						process.env.CHROME_EXECUTABLE_PATH || chromePaths.chrome,
 				},
+				userDataDir: path.join(app.getPath("userData"), "puppeteer-profile"),
 				brands,
 				years,
 			}

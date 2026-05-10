@@ -1,9 +1,15 @@
 import React, { useCallback, useEffect, useState } from "react"
+import { useDispatch } from "react-redux"
 import { RouterProvider, createMemoryRouter } from "react-router-dom"
 
+import {
+	normalizeStoredSettings,
+	setSettings,
+} from "@market-slice/application/slices/settings.js"
 import { App as AntdApp, ConfigProvider, theme } from "antd"
 import "normalize.css"
 
+import { electron } from "./electron.js"
 import { initialEntries, routes } from "./pages/index.js"
 
 const router = createMemoryRouter(routes(), {
@@ -11,6 +17,7 @@ const router = createMemoryRouter(routes(), {
 })
 
 export function App() {
+	const dispatch = useDispatch()
 	const [darkMode, setDarkMode] = useState(false)
 	const windowQuery = window.matchMedia("(prefers-color-scheme:dark)")
 
@@ -28,6 +35,24 @@ export function App() {
 	useEffect(() => {
 		setDarkMode(windowQuery.matches ? true : false)
 	}, [])
+
+	useEffect(() => {
+		let mounted = true
+		;(async () => {
+			try {
+				if (!electron?.getSettings) return
+				const saved = await electron.getSettings()
+				if (!mounted) return
+				const normalized = normalizeStoredSettings(saved)
+				if (normalized) dispatch(setSettings(normalized))
+			} catch {
+				/* userData или IPC недоступны — остаётся initialState */
+			}
+		})()
+		return () => {
+			mounted = false
+		}
+	}, [dispatch])
 
 	return (
 		<ConfigProvider

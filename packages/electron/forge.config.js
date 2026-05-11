@@ -1,6 +1,4 @@
 require("dotenv").config()
-const { exec } = require("node:child_process")
-const path = require("node:path")
 const { FusesPlugin } = require("@electron-forge/plugin-fuses")
 const { FuseV1Options, FuseVersion } = require("@electron/fuses")
 
@@ -9,19 +7,10 @@ module.exports = {
 		name: "market-slice",
 		asar: true,
 		extraResource: "externals/node_modules",
-		beforeCopyExtraResources: [
-			(_buildPath, _electronVersion, _platform, _arch, callback) => {
-				exec(
-					"npm i",
-					{
-						cwd: path.join(__dirname, "externals"),
-					},
-					callback,
-				)
-			},
-		],
 	},
-	rebuildConfig: {},
+	rebuildConfig: {
+		onlyModules: ["better-sqlite3"],
+	},
 	makers: [
 		{
 			name: "@electron-forge/maker-squirrel",

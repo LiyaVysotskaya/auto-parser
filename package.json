@@ -11,6 +11,9 @@
 	"license": "ISC",
 	"description": "Монорепозиторий для работы со срезом рынка автомобилей",
 	"type": "module",
+	"engines": {
+		"node": ">=18.0.0 <22.0.0"
+	},
 	"devDependencies": {
 		"@commitlint/cli": "^19.3.0",
 		"@commitlint/config-conventional": "^19.2.2",

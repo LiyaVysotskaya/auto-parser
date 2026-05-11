@@ -1,11 +1,14 @@
 {
 	"name": "@market-slice/electron",
-	"version": "1.5.0",
+	"version": "1.7.0",
 	"description": "Десктопное приложение для получения среза рынка автомобилей",
 	"main": ".webpack/main",
 	"scripts": {
+		"prestart": "node -e \"var v=+process.versions.node.split('.')[0];if(v>=22){console.error('\\n  Node '+process.version+' несовместим с electron-rebuild.\\n  Используйте Node 18–20. Текущий path: '+(process.execPath)+'\\n');process.exit(1)}\"",
 		"start": "electron-forge start",
+		"prepackage": "node -e \"var v=+process.versions.node.split('.')[0];if(v>=22){console.error('\\n  Node '+process.version+' несовместим с electron-rebuild.\\n  Используйте Node 18–20. Текущий path: '+(process.execPath)+'\\n');process.exit(1)}\" && cd externals && npm i",
 		"package": "electron-forge package",
+		"premake": "node -e \"var v=+process.versions.node.split('.')[0];if(v>=22){console.error('\\n  Node '+process.version+' несовместим с electron-rebuild.\\n  Используйте Node 18–20. Текущий path: '+(process.execPath)+'\\n');process.exit(1)}\" && cd externals && npm i",
 		"make": "electron-forge make",
 		"lint": "echo \"No linting configured\"",
 		"test": "echo \"No test specified\"",
@@ -32,6 +35,9 @@
 		"electron": "31.2.1",
 		"node-loader": "^2.0.0",
 		"style-loader": "^3.0.0"
+	},
+	"engines": {
+		"node": ">=18.0.0 <22.0.0"
 	},
 	"keywords": ["market-slice", "application", "desktop", "auto.ru"],
 	"author": "lavisotskaya <vysotskaya-liya@yandex.ru>",

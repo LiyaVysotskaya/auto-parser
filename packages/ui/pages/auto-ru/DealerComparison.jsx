@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 
 import {
 	Button,
@@ -14,7 +14,11 @@ import {
 	Typography,
 } from "antd"
 
-import { compareDealers, flattenReport } from "../../analytics.js"
+import {
+	compareDealers,
+	filterRowsFlatByCity,
+	flattenReport,
+} from "../../analytics.js"
 import { money, pct } from "./report-formatters.js"
 
 const { Text, Paragraph } = Typography
@@ -37,8 +41,12 @@ function uniqueSorted(rowsFlat, key) {
 	return [...s].sort((a, b) => a.localeCompare(b, "ru"))
 }
 
-export function DealerComparison({ report = [] }) {
-	const { rowsFlat } = useMemo(() => flattenReport(report), [report])
+export function DealerComparison({ report = [], forcedCity = null }) {
+	const { rowsFlat: rawFlat } = useMemo(() => flattenReport(report), [report])
+	const rowsFlat = useMemo(
+		() => filterRowsFlatByCity(rawFlat, forcedCity),
+		[rawFlat, forcedCity],
+	)
 	const dealers = useMemo(() => uniqueDealers(rowsFlat), [rowsFlat])
 	const allBrands = useMemo(() => uniqueSorted(rowsFlat, "brand"), [rowsFlat])
 	const allCities = useMemo(() => uniqueSorted(rowsFlat, "city"), [rowsFlat])
@@ -49,6 +57,10 @@ export function DealerComparison({ report = [] }) {
 	const [filterModels, setFilterModels] = useState([])
 	const [filterCities, setFilterCities] = useState([])
 	const [tableSearch, setTableSearch] = useState("")
+
+	useEffect(() => {
+		if (forcedCity) setFilterCities([])
+	}, [forcedCity])
 
 	const { rows: rawRows, summary: rawSummary } = useMemo(() => {
 		if (!baseDealer || !otherDealers.length) {
@@ -256,11 +268,17 @@ export function DealerComparison({ report = [] }) {
 	}
 
 	return (
-		<Card title="Сравнение дилеров" size="small">
+		<Card title="Сравнение цен конкурентов с базовым дилером" size="small" className="ms-filter-card">
 			<Space direction="vertical" style={{ width: "100%" }} size="middle">
 				<Paragraph type="secondary" style={{ marginBottom: 0 }}>
 					Сравнение по одинаковым позициям (модель, комплектация, модификация,
 					год, город), где есть цена у базового дилера и у выбранных конкурентов.
+					{forcedCity ? (
+						<>
+							{" "}
+							<Tag color="blue">Город: {forcedCity}</Tag>
+						</>
+					) : null}
 				</Paragraph>
 				<Space wrap>
 					<div>
@@ -351,20 +369,22 @@ export function DealerComparison({ report = [] }) {
 							onChange={setFilterModels}
 						/>
 					</div>
-					<div style={{ minWidth: 140 }}>
-						<div style={{ marginBottom: 4 }}>
-							<Text type="secondary">Город</Text>
+					{forcedCity ? null : (
+						<div style={{ minWidth: 140 }}>
+							<div style={{ marginBottom: 4 }}>
+								<Text type="secondary">Город</Text>
+							</div>
+							<Select
+								mode="multiple"
+								allowClear
+								placeholder="Все"
+								style={{ width: "100%" }}
+								options={allCities.map((c) => ({ value: c, label: c }))}
+								value={filterCities}
+								onChange={setFilterCities}
+							/>
 						</div>
-						<Select
-							mode="multiple"
-							allowClear
-							placeholder="Все"
-							style={{ width: "100%" }}
-							options={allCities.map((c) => ({ value: c, label: c }))}
-							value={filterCities}
-							onChange={setFilterCities}
-						/>
-					</div>
+					)}
 					<div style={{ minWidth: 220, flex: 1 }}>
 						<div style={{ marginBottom: 4 }}>
 							<Text type="secondary">Поиск по таблице</Text>
@@ -384,14 +404,14 @@ export function DealerComparison({ report = [] }) {
 							<Statistic
 								title="Базовый дешевле"
 								value={filteredSummary.baseCheaperCount}
-								valueStyle={{ color: "#52c41a" }}
+								valueStyle={{ color: "var(--ant-color-success)" }}
 							/>
 						</Col>
 						<Col xs={12} sm={8} md={4}>
 							<Statistic
 								title="Базовый дороже"
 								value={filteredSummary.baseExpensiveCount}
-								valueStyle={{ color: "#cf1322" }}
+								valueStyle={{ color: "var(--ant-color-error)" }}
 							/>
 						</Col>
 						<Col xs={12} sm={8} md={4}>

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useSelector } from "react-redux"
 
 import {
 	DownloadOutlined,
@@ -17,12 +18,13 @@ import {
 	YAxis,
 } from "recharts"
 import {
+	Alert,
 	Button,
 	Card,
-	Checkbox,
 	Col,
 	DatePicker,
 	Input,
+	InputNumber,
 	Row,
 	Select,
 	Segmented,
@@ -31,6 +33,7 @@ import {
 	Table,
 	Tabs,
 	Tag,
+	theme,
 	Typography,
 	Upload,
 	message,
@@ -40,67 +43,15 @@ import { parseXlsx } from "@market-slice/auto-ru/xlsx.js"
 
 import { diffFlattenedOffers, flattenReport } from "../../analytics.js"
 import { electron } from "../../electron.js"
+import { useTheme } from "../../theme-context.js"
+import { chartSeriesColors } from "../../theme-tokens.js"
+import { attachPriceDeltas, stableOfferKey } from "./offer-delta.js"
 import { money, pct } from "./report-formatters.js"
 
-const { Text, Title } = Typography
+const { Paragraph, Text, Title } = Typography
 const { RangePicker } = DatePicker
 
-const CHART_COLORS = [
-	"#1677ff",
-	"#52c41a",
-	"#fa8c16",
-	"#eb2f96",
-	"#722ed1",
-	"#13c2c2",
-	"#f5222d",
-	"#2f54eb",
-	"#a0d911",
-	"#faad14",
-]
-
-function stableOfferKey(r) {
-	return [
-		r.brand,
-		r.model,
-		r.equipment || "—",
-		r.modification || "—",
-		String(r.year ?? ""),
-		r.dealer || "—",
-		r.city || "—",
-	].join("\u0000")
-}
-
-function attachPriceDeltas(rows) {
-	const byKey = new Map()
-	for (const r of rows) {
-		const k = stableOfferKey(r)
-		if (!byKey.has(k)) byKey.set(k, [])
-		byKey.get(k).push(r)
-	}
-	for (const list of byKey.values()) {
-		list.sort((a, b) =>
-			String(a.run_started).localeCompare(String(b.run_started)),
-		)
-		for (let i = 0; i < list.length; i++) {
-			const cur = list[i]
-			const prev = list[i - 1]
-			let delta = null
-			let deltaPct = null
-			if (
-				prev &&
-				cur.price != null &&
-				prev.price != null &&
-				prev.run_started !== cur.run_started
-			) {
-				delta = cur.price - prev.price
-				deltaPct = prev.price ? delta / prev.price : null
-			}
-			cur._delta = delta
-			cur._deltaPct = deltaPct
-		}
-	}
-	return rows
-}
+const FALLBACK_CHART_PALETTE = ["#64748b", "#475569", "#334155"]
 
 function rowSearchHaystack(r) {
 	return [
@@ -171,7 +122,9 @@ function countOnDate(rows, datePrefix, pred) {
 	return n
 }
 
-function buildChartPack(rows, lineMode, metric, topN) {
+function buildChartPack(rows, lineMode, metric, topN, palette) {
+	const pal =
+		Array.isArray(palette) && palette.length > 0 ? palette : FALLBACK_CHART_PALETTE
 	const dates = [
 		...new Set(rows.map((r) => String(r.run_started || "").slice(0, 10))),
 	]
@@ -188,7 +141,13 @@ function buildChartPack(rows, lineMode, metric, topN) {
 		})
 		return {
 			data,
-			series: [{ key: "v0", label: metric === "count" ? "Предложений" : "Мин. цена" }],
+			series: [
+				{
+					key: "v0",
+					label: metric === "count" ? "Предложений" : "Мин. цена",
+					color: pal[0],
+				},
+			],
 			metric,
 		}
 	}
@@ -210,7 +169,7 @@ function buildChartPack(rows, lineMode, metric, topN) {
 	const series = topLabels.map((label, i) => ({
 		key: `v${i}`,
 		label,
-		color: CHART_COLORS[i % CHART_COLORS.length],
+		color: pal[i % pal.length],
 		pred:
 			lineMode === "dealer"
 				? (r) => String(r.dealer || "—") === label
@@ -232,8 +191,11 @@ function buildChartPack(rows, lineMode, metric, topN) {
 	return { data, series, metric }
 }
 
-export function PriceHistory() {
-	const [tab, setTab] = useState("table")
+export function PriceHistory({ initialTab = "table" } = {}) {
+	const [tab, setTab] = useState(initialTab)
+	useEffect(() => {
+		setTab(initialTab)
+	}, [initialTab])
 	const [range, setRange] = useState(() => [
 		dayjs().subtract(30, "day").startOf("day"),
 		dayjs().endOf("day"),
@@ -262,10 +224,19 @@ export function PriceHistory() {
 	const [tableView, setTableView] = useState("flat")
 	const [tableSearch, setTableSearch] = useState("")
 	const [deltaFilter, setDeltaFilter] = useState("all")
-	const [onlyChanged, setOnlyChanged] = useState(false)
+	/** all | changed | significant — по умолчанию только строки с изменением цены */
+	const [signalView, setSignalView] = useState("changed")
+	const [deltaMinAbs, setDeltaMinAbs] = useState(50_000)
+	const [deltaMinPct, setDeltaMinPct] = useState(1)
 
 	const [chartLineMode, setChartLineMode] = useState("overall")
 	const [chartMetric, setChartMetric] = useState("price")
+
+	const settings = useSelector((state) => state.settings)
+	const didAutoCity = useRef(false)
+	const { token } = theme.useToken()
+	const { isDark } = useTheme()
+	const chartPalette = useMemo(() => chartSeriesColors(isDark), [isDark])
 
 	const [diffBrands, setDiffBrands] = useState([])
 	const [diffModels, setDiffModels] = useState([])
@@ -325,6 +296,16 @@ export function PriceHistory() {
 	useEffect(() => {
 		loadMeta()
 	}, [loadMeta])
+
+	useEffect(() => {
+		if (didAutoCity.current) return
+		const mc = meta?.cities || []
+		const primary = settings?.city != null ? String(settings.city).trim() : ""
+		if (mc.length > 1 && primary && mc.includes(primary)) {
+			setCities([primary])
+			didAutoCity.current = true
+		}
+	}, [meta, settings?.city])
 
 	useEffect(() => {
 		loadRuns()
@@ -401,14 +382,31 @@ export function PriceHistory() {
 		let list = rows
 		const q = tableSearch.trim().toLowerCase()
 		if (q) list = list.filter((r) => rowSearchHaystack(r).includes(q))
-		if (onlyChanged) list = list.filter((r) => r._delta != null)
+		if (signalView === "changed" || signalView === "significant") {
+			list = list.filter((r) => r._delta != null)
+		}
+		if (signalView === "significant") {
+			const pctTol = deltaMinPct / 100
+			list = list.filter((r) => {
+				const absRub = Math.abs(r._delta)
+				const absPct = r._deltaPct != null ? Math.abs(r._deltaPct) : 0
+				return absRub >= deltaMinAbs || absPct >= pctTol
+			})
+		}
 		if (deltaFilter === "up") list = list.filter((r) => r._delta != null && r._delta > 0)
 		if (deltaFilter === "down")
 			list = list.filter((r) => r._delta != null && r._delta < 0)
 		if (deltaFilter === "same")
 			list = list.filter((r) => r._delta != null && r._delta === 0)
 		return list
-	}, [rows, tableSearch, onlyChanged, deltaFilter])
+	}, [
+		rows,
+		tableSearch,
+		signalView,
+		deltaMinAbs,
+		deltaMinPct,
+		deltaFilter,
+	])
 
 	const groupedHistoryParents = useMemo(() => {
 		if (tableView === "flat") return null
@@ -424,14 +422,15 @@ export function PriceHistory() {
 					groupTitle: gkey.includes("::")
 						? gkey.replace("::", " — ")
 						: gkey,
-					children: [],
+					/* не `children`: Table воспринимает это как tree-data и рисует пустые строки */
+					nestedRows: [],
 				})
 			}
-			map.get(gkey).children.push(r)
+			map.get(gkey).nestedRows.push(r)
 		}
 		const out = []
 		for (const g of map.values()) {
-			const ch = g.children
+			const ch = g.nestedRows
 			const priced = ch.map((x) => x.price).filter((p) => p != null)
 			const minP = priced.length ? Math.min(...priced) : null
 			const maxP = priced.length ? Math.max(...priced) : null
@@ -449,8 +448,8 @@ export function PriceHistory() {
 	}, [filteredHistoryRows, tableView])
 
 	const chartPack = useMemo(
-		() => buildChartPack(rows, chartLineMode, chartMetric, 10),
-		[rows, chartLineMode, chartMetric],
+		() => buildChartPack(rows, chartLineMode, chartMetric, 10, chartPalette),
+		[rows, chartLineMode, chartMetric, chartPalette],
 	)
 
 	const chartPrevMap = useMemo(() => {
@@ -541,17 +540,32 @@ export function PriceHistory() {
 				render: (_, r) => {
 					if (r._delta == null) return "—"
 					const down = r._delta < 0
+					const up = r._delta > 0
+					const arrow = down ? "↓ " : up ? "↑ " : ""
+					const color = down
+						? token.colorSuccess
+						: up
+							? token.colorError
+							: token.colorTextSecondary
 					return (
-						<Tag color={down ? "green" : r._delta > 0 ? "red" : "default"}>
-							{down ? "" : "+"}
+						<Text
+							strong
+							style={{
+								color,
+								fontVariantNumeric: "tabular-nums",
+								whiteSpace: "nowrap",
+							}}
+						>
+							{arrow}
+							{down ? "" : up ? "+" : ""}
 							{money(r._delta)}
 							{r._deltaPct != null ? ` (${(r._deltaPct * 100).toFixed(1)}%)` : ""}
-						</Tag>
+						</Text>
 					)
 				},
 			},
 		],
-		[],
+		[token.colorError, token.colorSuccess, token.colorTextSecondary],
 	)
 
 	const groupParentColumns = useMemo(
@@ -715,12 +729,13 @@ export function PriceHistory() {
 				diffGroupView === "dealer"
 					? String(r.dealer || "—")
 					: String(r.brand || "—")
-			if (!map.has(gkey)) map.set(gkey, { key: gkey, groupTitle: gkey, children: [] })
-			map.get(gkey).children.push(r)
+			if (!map.has(gkey))
+				map.set(gkey, { key: gkey, groupTitle: gkey, nestedRows: [] })
+			map.get(gkey).nestedRows.push(r)
 		}
 		return [...map.values()].map((g) => ({
 			...g,
-			childCount: g.children.length,
+			childCount: g.nestedRows.length,
 		}))
 	}, [diffFiltered, diffGroupView])
 
@@ -881,10 +896,13 @@ export function PriceHistory() {
 		return (
 			<div
 				style={{
-					background: "#fff",
-					border: "1px solid #eee",
-					padding: 8,
+					background: token.colorBgElevated,
+					border: `1px solid ${token.colorBorderSecondary}`,
+					borderRadius: token.borderRadius,
+					padding: "10px 12px",
 					fontSize: 12,
+					boxShadow: token.boxShadowSecondary,
+					color: token.colorText,
 				}}
 			>
 				<div style={{ marginBottom: 4 }}>
@@ -904,12 +922,17 @@ export function PriceHistory() {
 							: v != null
 								? `${Number(v).toLocaleString("ru-RU")} ₽`
 								: "—"
+					const lineColor = s?.color || p.color
 					return (
 						<div key={String(p.dataKey)} style={{ marginTop: 2 }}>
-							<span style={{ color: p.color }}>{name}: </span>
+							<span style={{ color: lineColor }}>{name}: </span>
 							{formatted}
 							{chartMetric === "price" && dlt != null ? (
-								<span style={{ color: dlt <= 0 ? "#52c41a" : "#cf1322" }}>
+								<span
+									style={{
+										color: dlt <= 0 ? token.colorSuccess : token.colorError,
+									}}
+								>
 									{" "}
 									(Δ {dlt > 0 ? "+" : ""}
 									{Math.round(dlt).toLocaleString("ru-RU")} ₽)
@@ -923,14 +946,37 @@ export function PriceHistory() {
 	}
 
 	return (
-		<div style={{ padding: 16 }}>
-			<Title level={3}>История цен</Title>
-			<Text type="secondary" style={{ display: "block", marginBottom: 16 }}>
-				Данные накапливаются после каждого завершённого парсинга. Экспорт и импорт
-				JSON — для обмена между коллегами.
-			</Text>
+		<div>
+			<div className="ms-page-hero">
+				<Title
+					level={2}
+					style={{ marginBottom: 8 }}
+				>
+					История цен
+				</Title>
+				<Paragraph
+					type="secondary"
+					style={{ marginBottom: 0 }}
+				>
+					Данные накапливаются после каждого завершённого парсинга. Сначала задайте
+					период и город — так сводки и графики останутся в одном регионе. Экспорт и
+					импорт JSON удобны для обмена между коллегами.
+				</Paragraph>
+			</div>
 
-			<Card size="small" style={{ marginBottom: 16 }}>
+			<Card
+				size="small"
+				style={{ marginBottom: 16 }}
+				className="ms-filter-card ms-summary-card"
+			>
+				{(meta?.cities || []).length > 1 && cities.length === 0 ? (
+					<Alert
+						type="info"
+						showIcon
+						style={{ marginBottom: 12 }}
+						message="Выберите город в фильтре ниже, чтобы графики и сводки не смешивали разные регионы."
+					/>
+				) : null}
 				<Space wrap align="start">
 					<div>
 						<div style={{ marginBottom: 4 }}>
@@ -1133,6 +1179,40 @@ export function PriceHistory() {
 											{ label: "По бренду — модель", value: "brandModel" },
 										]}
 									/>
+									<Text type="secondary">Сигнал:</Text>
+									<Segmented
+										value={signalView}
+										onChange={setSignalView}
+										options={[
+											{ label: "Все строки", value: "all" },
+											{ label: "Только Δ цены", value: "changed" },
+											{ label: "Сильные Δ", value: "significant" },
+										]}
+									/>
+									{signalView === "significant" ? (
+										<Space size="small" align="center" wrap>
+											<Text type="secondary">Порог:</Text>
+											<InputNumber
+												min={0}
+												step={10_000}
+												value={deltaMinAbs}
+												onChange={(v) => setDeltaMinAbs(Number(v) || 0)}
+												style={{ width: 128 }}
+											/>
+											<Text type="secondary">₽</Text>
+											<Text type="secondary">или</Text>
+											<InputNumber
+												min={0}
+												max={100}
+												step={0.5}
+												value={deltaMinPct}
+												onChange={(v) => setDeltaMinPct(Number(v) || 0)}
+												style={{ width: 72 }}
+											/>
+											<Text type="secondary">%</Text>
+										</Space>
+									) : null}
+									<Text type="secondary">Направление:</Text>
 									<Segmented
 										value={deltaFilter}
 										onChange={setDeltaFilter}
@@ -1143,12 +1223,6 @@ export function PriceHistory() {
 											{ label: "Без изм.", value: "same" },
 										]}
 									/>
-									<Checkbox
-										checked={onlyChanged}
-										onChange={(e) => setOnlyChanged(e.target.checked)}
-									>
-										Только с изменением цены
-									</Checkbox>
 									<Input.Search
 										allowClear
 										placeholder="Поиск по таблице"
@@ -1177,12 +1251,13 @@ export function PriceHistory() {
 										expandable={{
 											expandedRowRender: (rec) => (
 												<Table
+													className="ms-table-polished"
 													size="small"
 													rowKey={(r) =>
 														`${r.id ?? r.run_id}-${stableOfferKey(r)}`
 													}
 													columns={tableColumns}
-													dataSource={rec.children}
+													dataSource={rec.nestedRows}
 													pagination={false}
 													scroll={{ x: 1200 }}
 												/>
@@ -1222,50 +1297,78 @@ export function PriceHistory() {
 								<Text type="secondary">{chartTitleText}</Text>
 								{chartPack.data.length ? (
 									chartMetric === "count" ? (
-										<ResponsiveContainer width="100%" height={360}>
-											<BarChart data={chartPack.data}>
-												<CartesianGrid strokeDasharray="3 3" />
-												<XAxis dataKey="date" tick={{ fontSize: 11 }} />
-												<YAxis tick={{ fontSize: 11 }} />
-												<Tooltip content={chartTooltip} />
-												<Legend />
-												{chartPack.series.map((s, i) => (
-													<Bar
-														key={s.key}
-														dataKey={s.key}
-														name={s.label}
-														fill={CHART_COLORS[i % CHART_COLORS.length]}
+										<div className="ms-chart-surface">
+											<ResponsiveContainer width="100%" height={360}>
+												<BarChart data={chartPack.data}>
+													<CartesianGrid
+														strokeDasharray="3 3"
+														stroke={token.colorBorderSecondary}
+														vertical={false}
+														opacity={0.5}
 													/>
-												))}
-											</BarChart>
-										</ResponsiveContainer>
+													<XAxis
+														dataKey="date"
+														tick={{ fontSize: 11, fill: token.colorTextTertiary }}
+														stroke={token.colorBorderSecondary}
+													/>
+													<YAxis
+														tick={{ fontSize: 11, fill: token.colorTextTertiary }}
+														stroke={token.colorBorderSecondary}
+													/>
+													<Tooltip content={chartTooltip} />
+													<Legend wrapperStyle={{ fontSize: 12 }} />
+													{chartPack.series.map((s) => (
+														<Bar
+															key={s.key}
+															dataKey={s.key}
+															name={s.label}
+															fill={s.color}
+															radius={[3, 3, 0, 0]}
+															maxBarSize={48}
+														/>
+													))}
+												</BarChart>
+											</ResponsiveContainer>
+										</div>
 									) : (
-										<ResponsiveContainer width="100%" height={360}>
-											<LineChart data={chartPack.data}>
-												<CartesianGrid strokeDasharray="3 3" />
-												<XAxis dataKey="date" tick={{ fontSize: 11 }} />
-												<YAxis
-													tick={{ fontSize: 11 }}
-													tickFormatter={(v) =>
-														v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v
-													}
-												/>
-												<Tooltip content={chartTooltip} />
-												<Legend />
-												{chartPack.series.map((s, i) => (
-													<Line
-														key={s.key}
-														type="monotone"
-														dataKey={s.key}
-														name={s.label}
-														stroke={CHART_COLORS[i % CHART_COLORS.length]}
-														strokeWidth={2}
-														dot={{ r: 2 }}
-														connectNulls
+										<div className="ms-chart-surface">
+											<ResponsiveContainer width="100%" height={360}>
+												<LineChart data={chartPack.data}>
+													<CartesianGrid
+														strokeDasharray="3 3"
+														stroke={token.colorBorderSecondary}
+														opacity={0.5}
 													/>
-												))}
-											</LineChart>
-										</ResponsiveContainer>
+													<XAxis
+														dataKey="date"
+														tick={{ fontSize: 11, fill: token.colorTextTertiary }}
+														stroke={token.colorBorderSecondary}
+													/>
+													<YAxis
+														tick={{ fontSize: 11, fill: token.colorTextTertiary }}
+														stroke={token.colorBorderSecondary}
+														tickFormatter={(v) =>
+															v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v
+														}
+													/>
+													<Tooltip content={chartTooltip} />
+													<Legend wrapperStyle={{ fontSize: 12 }} />
+													{chartPack.series.map((s) => (
+														<Line
+															key={s.key}
+															type="monotone"
+															dataKey={s.key}
+															name={s.label}
+															stroke={s.color}
+															strokeWidth={2}
+															dot={{ r: 2.5, strokeWidth: 1 }}
+															activeDot={{ r: 4 }}
+															connectNulls
+														/>
+													))}
+												</LineChart>
+											</ResponsiveContainer>
+										</div>
 									)
 								) : (
 									<Text type="secondary">Нет данных для графика</Text>
@@ -1445,10 +1548,11 @@ export function PriceHistory() {
 										expandable={{
 											expandedRowRender: (rec) => (
 												<Table
+													className="ms-table-polished"
 													size="small"
 													rowKey="key"
 													columns={diffColumns}
-													dataSource={rec.children}
+													dataSource={rec.nestedRows}
 													pagination={false}
 													scroll={{ x: 1000 }}
 												/>

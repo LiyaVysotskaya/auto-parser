@@ -1,0 +1,643 @@
+/* Глобальная полировка UI: сетка, карточки, таблицы, боковая панель */
+
+:root {
+	--ms-font-sans: system-ui, -apple-system, "Segoe UI", roboto, "Helvetica Neue",
+		arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+	--ms-font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", menlo,
+		consolas, monospace;
+	--ms-green: #5dcaa5;
+	--ms-red: #f0997b;
+	--ms-amber: #fac775;
+	--ms-blue-soft: #85b7eb;
+	--ms-acc: #378add;
+	--ms-acc2: #185fa5;
+}
+
+html,
+body,
+#root {
+	font-family: var(--ms-font-sans);
+	-webkit-font-smoothing: antialiased;
+}
+
+.ms-page-hero {
+	margin-bottom: 20px;
+	max-width: 920px;
+}
+
+.ms-page-hero .ant-typography:last-child {
+	margin-bottom: 0;
+}
+
+.ms-page-hero .ant-typography.ant-typography-secondary {
+	font-size: 14px;
+	line-height: 1.55;
+}
+
+/* KPI-сетка */
+.ms-stat-grid {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 12px;
+	margin-bottom: 0;
+}
+
+@media (max-width: 992px) {
+	.ms-stat-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 576px) {
+	.ms-stat-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+.ms-stat-tile {
+	border-radius: var(--ant-border-radius-lg, 12px);
+	padding: 14px 16px;
+	border: 1px solid var(--ant-color-border-secondary);
+	background: var(--ant-color-bg-container);
+	box-shadow: var(--ant-box-shadow-tertiary, none);
+}
+
+.ms-stat-tile .ant-statistic-title {
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--ant-color-text-tertiary);
+	opacity: 1;
+}
+
+.ms-stat-tile .ant-statistic-content-value {
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: "tnum" 1;
+}
+
+.ms-summary-card {
+	border-radius: var(--ant-border-radius-lg, 14px);
+	border: 1px solid var(--ant-color-border-secondary);
+	box-shadow: var(--ant-box-shadow-secondary, none);
+	overflow: hidden;
+}
+
+.ms-summary-card > .ant-card-body {
+	padding: 16px 18px 18px;
+}
+
+.ms-summary-card .ms-stat-grid .ms-stat-tile {
+	box-shadow: none;
+}
+
+.ms-filter-card .ant-card-body {
+	padding-bottom: 14px;
+}
+
+/* Логотип сайдбара */
+.ms-sider-logo {
+	padding: 18px 16px;
+	border-bottom: 1px solid var(--ant-color-border-secondary);
+	margin-bottom: 6px;
+}
+
+.ms-sider-logo-title {
+	font-size: 17px;
+	font-weight: 600;
+	letter-spacing: -0.02em;
+	line-height: 1.25;
+	color: var(--ant-color-text);
+}
+
+.ms-sider-logo-title span {
+	color: var(--ant-color-primary);
+}
+
+.ms-sider-logo-sub {
+	font-size: 12px;
+	color: var(--ant-color-text-tertiary);
+	margin-top: 4px;
+	line-height: 1.35;
+}
+
+.ms-header-bar {
+	border-bottom: 1px solid var(--ant-color-border-secondary);
+	backdrop-filter: blur(8px);
+}
+
+.ms-main-content {
+	padding: 20px 22px 28px;
+	max-width: 1600px;
+	margin: 0 auto;
+}
+
+.ms-mono-nums {
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: "tnum" 1;
+}
+
+/* Панель действий на главной */
+.ms-toolbar-card.ant-card {
+	border-radius: var(--ant-border-radius-lg, 14px);
+	border: 1px solid var(--ant-color-border-secondary);
+	box-shadow: var(--ant-box-shadow-secondary, none);
+}
+
+.ms-toolbar-card > .ant-card-body {
+	padding: 16px 18px;
+}
+
+/* Теги брендов — крупнее и контрастнее */
+.ms-brand-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 10px;
+}
+
+.ms-brand-tag {
+	font-size: 13px !important;
+	line-height: 1.4 !important;
+	padding: 6px 12px !important;
+	margin: 0 !important;
+	border-radius: 999px !important;
+	font-weight: 500;
+	border: 1px solid var(--ant-color-border-secondary) !important;
+}
+
+.ms-brand-tag.ant-tag-blue,
+.ms-brand-tag[class*="color-processing"] {
+	border-color: rgba(37, 99, 235, 0.35) !important;
+}
+
+/* Карточки конфигурации на главной */
+.ms-dash-card.ant-card {
+	border-radius: var(--ant-border-radius-lg, 12px);
+	border: 1px solid var(--ant-color-border-secondary);
+	box-shadow: var(--ant-box-shadow-tertiary, none);
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ms-dash-card.ant-card:hover {
+	border-color: var(--ant-color-primary-border-hover);
+	box-shadow: var(--ant-box-shadow-secondary, none);
+}
+
+.ms-dash-card > .ant-card-head {
+	min-height: 44px;
+	padding: 0 16px;
+	font-weight: 600;
+}
+
+.ms-dash-card > .ant-card-body {
+	padding: 14px 16px 16px;
+}
+
+/* Журнал: компактные строки вместо «стены» Alert */
+.ms-log-list.ant-list-split .ant-list-item {
+	border-block-end-color: var(--ant-color-border-secondary);
+	padding: 10px 12px;
+}
+
+.ms-log-line {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	font-size: 13px;
+	line-height: 1.45;
+}
+
+.ms-log-line time {
+	flex: 0 0 auto;
+	font-family: var(--ms-font-mono);
+	font-size: 12px;
+	color: var(--ant-color-text-tertiary);
+}
+
+.ms-log-line-msg {
+	flex: 1;
+	min-width: 0;
+	color: var(--ant-color-text);
+}
+
+.ms-log-line--info {
+	border-inline-start: 3px solid var(--ant-color-info);
+	padding-inline-start: 4px;
+}
+
+.ms-log-line--success {
+	border-inline-start: 3px solid var(--ant-color-success);
+	padding-inline-start: 4px;
+}
+
+.ms-log-line--warning {
+	border-inline-start: 3px solid var(--ant-color-warning);
+	padding-inline-start: 4px;
+}
+
+.ms-log-line--error {
+	border-inline-start: 3px solid var(--ant-color-error);
+	padding-inline-start: 4px;
+}
+
+/* Таблицы: чуть плотнее заголовок, понятнее строки */
+.ant-table-wrapper.ms-table-polished .ant-table-thead > tr > th {
+	font-weight: 600;
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.ant-table-wrapper.ms-table-polished .ant-table-tbody > tr > td {
+	font-size: 13px;
+}
+
+/* Меню: акцент слева как в референсе */
+.ant-menu.ms-sider-menu.ant-menu-root.ant-menu-inline .ant-menu-item,
+.ant-menu.ms-sider-menu.ant-menu-root.ant-menu-inline .ant-menu-submenu-title {
+	margin-block: 4px;
+}
+
+.ant-menu.ms-sider-menu .ant-menu-item-selected {
+	font-weight: 600;
+}
+
+/* Область графиков — как «карта» в ref HTML: ровная рамка, без лишнего шума */
+.ms-chart-surface {
+	padding: 14px 16px 10px;
+	border-radius: var(--ant-border-radius-lg, 12px);
+	border: 1px solid var(--ant-color-border-secondary);
+	background: var(--ant-color-bg-container);
+	box-shadow: var(--ant-box-shadow-tertiary, none);
+}
+
+.ms-chart-surface .recharts-legend-item-text {
+	color: var(--ant-color-text-secondary) !important;
+	font-size: 12px !important;
+}
+
+/* —— Макет «кокпит» (auto_ru_full_app.html) —— */
+.ms-dash-actions {
+	margin-bottom: 8px;
+}
+
+.ms-cockpit-g2 {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+	margin-bottom: 12px;
+}
+
+@media (max-width: 900px) {
+	.ms-cockpit-g2 {
+		grid-template-columns: 1fr;
+	}
+}
+
+.ms-cockpit-g3 {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 10px;
+	margin-bottom: 12px;
+}
+
+@media (max-width: 992px) {
+	.ms-cockpit-g3 {
+		grid-template-columns: 1fr;
+	}
+}
+
+.ms-card-hd {
+	font-size: 10px;
+	font-weight: 500;
+	color: var(--ant-color-text-tertiary);
+	text-transform: uppercase;
+	letter-spacing: 0.6px;
+	margin-bottom: 8px;
+}
+
+.ms-card-hd-inline {
+	font-size: 10px;
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: 0.6px;
+}
+
+.ms-stat-delta {
+	font-size: 11px;
+	margin-top: 4px;
+}
+
+.ms-stat-delta--muted {
+	color: var(--ant-color-text-tertiary);
+}
+
+.ms-stat-delta--up {
+	color: var(--ms-green);
+}
+
+.ms-stat-delta--dn {
+	color: var(--ms-red);
+}
+
+.ms-stat-tile-val {
+	font-size: 20px;
+	font-weight: 500;
+	line-height: 1.1;
+	margin-top: 4px;
+}
+
+.ms-val-blue {
+	color: var(--ms-blue-soft);
+}
+
+.ms-val-green {
+	color: var(--ms-green);
+}
+
+.ms-val-red {
+	color: var(--ms-red);
+}
+
+.ms-val-amber {
+	color: var(--ms-amber);
+}
+
+.ms-price-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 7px 0;
+	border-bottom: 0.5px solid var(--ant-color-border-secondary);
+}
+
+.ms-price-row:last-child {
+	border-bottom: none;
+}
+
+.ms-pr-name {
+	font-size: 12px;
+	color: var(--ant-color-text);
+	font-weight: 500;
+}
+
+.ms-pr-detail {
+	font-size: 11px;
+	color: var(--ant-color-text-tertiary);
+	margin-top: 1px;
+}
+
+.ms-fav-tile {
+	border: 0.5px solid var(--ant-color-border-secondary);
+	border-radius: 8px;
+	padding: 10px 12px;
+	background: var(--ant-color-bg-container);
+}
+
+.ms-fav-price {
+	font-size: 15px;
+	font-weight: 500;
+	margin-top: 6px;
+	color: var(--ms-green);
+}
+
+.ms-log-tag {
+	font-size: 10px;
+	font-weight: 600;
+}
+
+.ms-log-tag--info {
+	color: var(--ms-blue-soft);
+}
+
+.ms-log-tag--success {
+	color: var(--ms-green);
+}
+
+.ms-log-tag--warning {
+	color: var(--ms-amber);
+}
+
+.ms-log-tag--error {
+	color: var(--ms-red);
+}
+
+.ms-nav-badge {
+	margin-left: auto;
+	background: var(--ms-acc2);
+	color: var(--ms-blue-soft);
+	font-size: 10px;
+	padding: 1px 6px;
+	border-radius: 3px;
+	font-weight: 500;
+}
+
+.ms-donut-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	margin-bottom: 6px;
+}
+
+.ms-donut-legend-item {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+}
+
+.ms-donut-legend-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 2px;
+	flex-shrink: 0;
+}
+
+/* Таблица как в HTML: компактный thead */
+.ant-table-wrapper.ms-table-polished .ant-table-thead > tr > th {
+	font-size: 10px;
+	font-weight: 500;
+	letter-spacing: 0.05em;
+}
+
+.ant-table-wrapper.ms-table-polished .ant-table-tbody > tr > td {
+	font-size: 12px;
+}
+
+/* Чипы / строки конкурентов (если ещё не заданы выше в сборке) */
+.ms-chip {
+	display: inline-block;
+	padding: 1px 6px;
+	border-radius: 3px;
+	font-size: 10px;
+	line-height: 1.7;
+	font-weight: 500;
+	white-space: nowrap;
+}
+
+.ms-chip-blue {
+	background: rgba(55, 138, 221, 0.13);
+	color: var(--ms-blue-soft);
+}
+
+.ms-chip-red {
+	background: rgba(240, 153, 123, 0.13);
+	color: var(--ms-red);
+}
+
+.ms-badge-up,
+.ms-badge-dn {
+	display: inline-block;
+	font-size: 11px;
+	padding: 2px 8px;
+	border-radius: 4px;
+	white-space: nowrap;
+}
+
+.ms-badge-up {
+	background: rgba(240, 153, 123, 0.12);
+	color: var(--ms-red);
+}
+
+.ms-badge-dn {
+	background: rgba(93, 202, 165, 0.12);
+	color: var(--ms-green);
+}
+
+.ms-comp-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 7px 0;
+	border-bottom: 0.5px solid var(--ant-color-border-secondary);
+}
+
+.ms-comp-row:last-child {
+	border-bottom: none;
+}
+
+.ms-comp-name {
+	font-size: 12px;
+	color: var(--ant-color-text);
+	flex: 1;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.ms-bar-bg {
+	width: 80px;
+	height: 5px;
+	background: rgba(255, 255, 255, 0.07);
+	border-radius: 3px;
+	overflow: hidden;
+	flex-shrink: 0;
+}
+
+.ms-bar-fill {
+	height: 100%;
+	border-radius: 3px;
+	background: var(--ms-acc2);
+}
+
+.ms-comp-cnt {
+	font-size: 12px;
+	color: var(--ant-color-text-secondary);
+	width: 28px;
+	text-align: right;
+	flex-shrink: 0;
+}
+
+.ms-mini-pos {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	background: var(--ms-acc2);
+	color: var(--ms-blue-soft);
+	font-size: 10px;
+	font-weight: 500;
+}
+
+.ms-mini-pos.p1 {
+	background: #633806;
+	color: var(--ms-amber);
+}
+
+.ms-mini-pos.p2 {
+	background: rgba(255, 255, 255, 0.08);
+	color: var(--ant-color-text-secondary);
+}
+
+.ms-mini-pos.p3 {
+	background: rgba(255, 255, 255, 0.05);
+	color: var(--ant-color-text-tertiary);
+}
+
+.ms-tabs-bar {
+	display: inline-flex;
+	gap: 2px;
+	background: rgba(255, 255, 255, 0.05);
+	border-radius: 8px;
+	padding: 3px;
+	margin-bottom: 12px;
+}
+
+.ms-tab-btn {
+	padding: 5px 13px;
+	border-radius: 6px;
+	font-size: 12px;
+	cursor: pointer;
+	color: var(--ant-color-text-tertiary);
+	border: none;
+	background: transparent;
+	transition: color 0.12s, background 0.12s;
+	font-family: var(--ms-font-sans);
+}
+
+.ms-tab-btn.active {
+	background: rgba(55, 138, 221, 0.18);
+	color: var(--ms-blue-soft);
+}
+
+.ms-tab-btn:hover:not(.active) {
+	color: var(--ant-color-text-secondary);
+	background: rgba(255, 255, 255, 0.05);
+}
+
+.ms-launch-info {
+	background: var(--ant-color-bg-elevated);
+	border: 0.5px solid var(--ant-color-border-secondary);
+	border-radius: 8px;
+	padding: 12px;
+	margin-bottom: 12px;
+}
+
+.ms-launch-info-row {
+	display: flex;
+	gap: 6px;
+	font-size: 12px;
+	padding: 3px 0;
+	color: var(--ant-color-text-secondary);
+}
+
+.ms-launch-info-label {
+	color: var(--ant-color-text-tertiary);
+	min-width: 90px;
+	flex-shrink: 0;
+}
+
+.ms-run-log {
+	font-size: 11px;
+	color: var(--ant-color-text-tertiary);
+	font-family: var(--ms-font-mono);
+	line-height: 1.8;
+	background: var(--ant-color-bg-elevated);
+	border: 0.5px solid var(--ant-color-border-secondary);
+	border-radius: 8px;
+	padding: 10px 12px;
+	max-height: 120px;
+	overflow-y: auto;
+}

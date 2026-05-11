@@ -10,8 +10,10 @@ import { App as AntdApp, ConfigProvider, theme } from "antd"
 import "normalize.css"
 
 import { electron } from "./electron.js"
+import "./global.css"
 import { initialEntries, routes } from "./pages/index.js"
 import { ThemeProvider, useTheme } from "./theme-context.js"
+import { buildAntdTheme } from "./theme-tokens.js"
 
 const router = createMemoryRouter(routes(), {
 	initialEntries,
@@ -45,12 +47,20 @@ function AppInner() {
 		}
 	}, [dispatch])
 
+	/* Светлая тема без compact — крупнее типографика и удобнее для «рабочего» дашборда */
 	const algorithms = isDark
 		? [theme.darkAlgorithm, theme.compactAlgorithm]
-		: [theme.compactAlgorithm]
+		: [theme.defaultAlgorithm]
+	const tk = buildAntdTheme(isDark)
 
 	return (
-		<ConfigProvider theme={{ algorithm: algorithms }}>
+		<ConfigProvider
+			theme={{
+				algorithm: algorithms,
+				token: tk.token,
+				components: tk.components,
+			}}
+		>
 			<AntdApp>
 				<RouterProvider router={router} />
 			</AntdApp>

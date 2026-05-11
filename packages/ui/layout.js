@@ -18,58 +18,40 @@ import {
 	Menu,
 	Segmented,
 	Space,
+	theme,
 } from "antd"
 import * as dateFns from "date-fns"
 
-import { defaultRoutes, menu, pages } from "./pages/index.js"
+import { breadcrumbItemsFromPath, defaultRoutes, menu } from "./pages/index.js"
 import { useTheme } from "./theme-context.js"
 
 const { Content, Sider, Header } = AntdLayout
-
-function buildBreadcrumb(pathname) {
-	const segments = pathname.split("/").filter(Boolean)
-	const items = [{ title: "Главная" }]
-
-	function findLabel(nodes, path) {
-		for (const node of nodes) {
-			if (node.path === path) return node.label
-			if (node.children) {
-				const found = findLabel(node.children, path)
-				if (found) return found
-			}
-		}
-		return null
-	}
-
-	let current = ""
-	for (const seg of segments) {
-		current += "/" + seg
-		const label = findLabel(pages, seg)
-		if (label) items.push({ title: label })
-	}
-
-	return items
-}
 
 export function Layout() {
 	const navigate = useNavigate()
 	const location = useLocation()
 	const logs = useSelector((state) => state.log)
-	const { mode, setMode } = useTheme()
+	const { mode, setMode, isDark } = useTheme()
 	const [collapsed, setCollapsed] = useState(false)
+	const { token } = theme.useToken()
 
-	const breadcrumbItems = buildBreadcrumb(location.pathname)
+	const breadcrumbItems = breadcrumbItemsFromPath(location.pathname)
+
+	const siderBg = isDark ? token.colorBgElevated : token.colorBgContainer
+	const logoBorder = token.colorBorderSecondary
 
 	return (
 		<AntdLayout
 			hasSider
-			style={{ minHeight: "100vh" }}
+			style={{ minHeight: "100vh", background: token.colorBgLayout }}
 		>
 			<Sider
 				collapsible
 				collapsed={collapsed}
 				onCollapse={setCollapsed}
 				trigger={null}
+				width={220}
+				collapsedWidth={80}
 				style={{
 					overflow: "auto",
 					height: "100vh",
@@ -77,40 +59,72 @@ export function Layout() {
 					left: 0,
 					top: 0,
 					bottom: 0,
+					background: siderBg,
+					borderRight: `0.5px solid ${logoBorder}`,
 				}}
 			>
+				<div
+					className="ms-sider-logo"
+					style={{ borderBottomColor: logoBorder }}
+				>
+					<div className="ms-sider-logo-title">
+						Auto<span>.Ru</span>
+					</div>
+					<div className="ms-sider-logo-sub">Мониторинг цен</div>
+				</div>
 				<Menu
-					theme="dark"
+					className="ms-sider-menu"
+					theme={isDark ? "dark" : "light"}
 					mode="inline"
 					items={menu()}
 					onSelect={({ key }) => navigate(key)}
 					selectedKeys={[location.pathname]}
 					defaultOpenKeys={defaultRoutes}
+					style={{
+						background: "transparent",
+						borderInlineEnd: "none",
+						padding: "8px 6px 16px",
+					}}
 				/>
 			</Sider>
 			<AntdLayout
 				style={{
-					marginLeft: collapsed ? 80 : 200,
+					marginLeft: collapsed ? 80 : 220,
 					transition: "margin-left 0.2s",
+					background: token.colorBgLayout,
 				}}
 			>
 				<Header
+					className="ms-header-bar"
 					style={{
-						padding: "0 16px",
+						padding: "0 20px",
 						display: "flex",
 						alignItems: "center",
 						justifyContent: "space-between",
-						background: "transparent",
-						height: 48,
+						background: token.colorBgLayout,
+						height: 56,
+						borderBottom: `1px solid ${token.colorBorderSecondary}`,
 					}}
 				>
-					<Space>
+					<Space
+						align="center"
+						size={12}
+					>
 						<Button
 							type="text"
 							icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
 							onClick={() => setCollapsed(!collapsed)}
+							aria-label={collapsed ? "Развернуть меню" : "Свернуть меню"}
 						/>
-						<Breadcrumb items={breadcrumbItems} />
+						<div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+							<Breadcrumb
+								items={breadcrumbItems}
+								style={{
+									fontSize: 13,
+									color: token.colorTextSecondary,
+								}}
+							/>
+						</div>
 					</Space>
 					<Segmented
 						size="small"
@@ -124,10 +138,10 @@ export function Layout() {
 					/>
 				</Header>
 				<Content
+					className="ms-main-content"
 					style={{
-						minHeight: "calc(100vh - 48px)",
+						minHeight: "calc(100vh - 56px)",
 						overflow: "initial",
-						padding: 16,
 					}}
 				>
 					<Outlet />

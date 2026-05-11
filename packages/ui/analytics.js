@@ -4,6 +4,90 @@ export function flattenReport(report = []) {
 	return flattenReportFromApp(report)
 }
 
+/** City ids present in report (excludes placeholder "—"). */
+export function uniqueCitiesFromReport(report = []) {
+	const { rowsFlat } = flattenReport(report)
+	const s = new Set()
+	for (const r of rowsFlat) {
+		const c =
+			r.city != null && String(r.city).trim() !== ""
+				? String(r.city).trim()
+				: "—"
+		if (c !== "—") s.add(c)
+	}
+	return [...s].sort((a, b) => a.localeCompare(b, "ru"))
+}
+
+/**
+ * Pick default city for analytics: single city in data, else settings.city if
+ * listed, else first settings.cities hit, else first in report.
+ */
+export function resolveReportCityScope(report = [], settings = {}) {
+	const cities = uniqueCitiesFromReport(report)
+	if (cities.length === 0) return null
+	if (cities.length === 1) return cities[0]
+	const primary = settings.city != null ? String(settings.city).trim() : ""
+	if (primary && cities.includes(primary)) return primary
+	const multi = Array.isArray(settings.cities) ? settings.cities : []
+	for (const id of multi) {
+		const sid = String(id || "").trim()
+		if (sid && cities.includes(sid)) return sid
+	}
+	return cities[0]
+}
+
+export function filterRowsFlatByCity(rowsFlat, city) {
+	if (city == null || String(city).trim() === "") return rowsFlat
+	const c = String(city).trim()
+	return rowsFlat.filter((r) => {
+		const rc =
+			r.city != null && String(r.city).trim() !== ""
+				? String(r.city).trim()
+				: "—"
+		return rc === c
+	})
+}
+
+function buildDealerCounts(rowsFlat) {
+	const dealerCounts = {}
+	for (const offer of rowsFlat) {
+		dealerCounts[offer.dealer] =
+			(dealerCounts[offer.dealer] || 0) + (offer.count || 0)
+	}
+	return dealerCounts
+}
+
+/** Rows under one dealer: model lines with unit counts (for drill-down UI). */
+export function dealerModelBreakdown(rowsFlat, dealerName, limit = 80) {
+	const d = String(dealerName || "").trim()
+	if (!d) return []
+	const map = new Map()
+	for (const r of rowsFlat) {
+		if (String(r.dealer || "").trim() !== d) continue
+		const key = [
+			r.brand,
+			r.model,
+			r.equipment,
+			r.modification,
+			String(r.year ?? ""),
+		].join("\u0000")
+		const prev = map.get(key) || {
+			brand: r.brand,
+			model: r.model,
+			equipment: r.equipment,
+			modification: r.modification,
+			year: r.year,
+			units: 0,
+			minPrice: null,
+		}
+		prev.units += r.count || 0
+		if (r.price != null && (prev.minPrice == null || r.price < prev.minPrice))
+			prev.minPrice = r.price
+		map.set(key, prev)
+	}
+	return [...map.values()].sort((a, b) => b.units - a.units).slice(0, limit)
+}
+
 export function computeSummary(rowsFlat) {
 	let totalUnits = 0
 	let totalPriceSum = 0
@@ -155,9 +239,11 @@ export function groupByBrand(perModelSummary) {
 	return perBrand
 }
 
-export function analyticsForSingleTab(tab) {
+export function analyticsForSingleTab(tab, opts = {}) {
 	const slice = tab && Array.isArray(tab.rows) ? [tab] : []
-	const { rowsFlat, dealerCounts } = flattenReport(slice)
+	const { rowsFlat: rawFlat } = flattenReport(slice)
+	const rowsFlat = filterRowsFlatByCity(rawFlat, opts.city)
+	const dealerCounts = buildDealerCounts(rowsFlat)
 	const summary = computeSummary(rowsFlat)
 	const { topCheapest, topDiscounts, topValue, topDealers } = computeTopLists(
 		rowsFlat,
@@ -195,11 +281,11 @@ export function analyticsForSingleTab(tab) {
 	}
 }
 
-export function computePerBrandAnalytics(report = []) {
+export function computePerBrandAnalytics(report = [], opts = {}) {
 	const out = {}
 	for (const tab of report) {
 		const brand = tab?.name || "Unknown"
-		out[brand] = analyticsForSingleTab(tab)
+		out[brand] = analyticsForSingleTab(tab, opts)
 	}
 	return out
 }
@@ -291,8 +377,10 @@ export function compareDealers(rowsFlat, baseDealer, otherDealers = []) {
 	return { rows, summary }
 }
 
-export function generateComprehensiveAnalytics(report = []) {
-	const { rowsFlat, dealerCounts } = flattenReport(report)
+export function generateComprehensiveAnalytics(report = [], opts = {}) {
+	const { rowsFlat: allFlat } = flattenReport(report)
+	const rowsFlat = filterRowsFlatByCity(allFlat, opts.city)
+	const dealerCounts = buildDealerCounts(rowsFlat)
 	const summary = computeSummary(rowsFlat)
 	const { topCheapest, topDiscounts, topValue, topDealers } = computeTopLists(
 		rowsFlat,
@@ -326,7 +414,7 @@ export function generateComprehensiveAnalytics(report = []) {
 		.slice(0, 10)
 		.map((item) => ({ ...item, topDealer: item.minDealer || "—" }))
 
-	const perBrandAnalytics = computePerBrandAnalytics(report)
+	const perBrandAnalytics = computePerBrandAnalytics(report, opts)
 
 	return {
 		summary,

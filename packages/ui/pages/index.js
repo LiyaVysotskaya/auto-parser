@@ -2,17 +2,57 @@ import React from "react"
 
 import {
 	DashboardOutlined,
+	DiffOutlined,
 	LineChartOutlined,
 	SettingOutlined,
+	ShopOutlined,
 	TableOutlined,
 } from "@ant-design/icons"
+import { instance as reduxStore } from "@market-slice/application/store"
 import _ from "lodash"
 
 import { Layout } from "../layout.js"
+import { Competitors } from "./auto-ru/Competitors.jsx"
 import { PriceHistory } from "./auto-ru/PriceHistory.jsx"
+import { ReportCompare } from "./auto-ru/ReportCompare.jsx"
 import { AutoRu } from "./auto-ru/index.js"
 import { AutoRuReport } from "./auto-ru/report.js"
 import { Settings } from "./settings/index.js"
+
+function reportRowsBadgeCount() {
+	try {
+		const report = reduxStore.getState().autoRu?.report || []
+		let n = 0
+		for (const t of report) {
+			if (Array.isArray(t.rows)) n += t.rows.length
+		}
+		return n
+	} catch {
+		return 0
+	}
+}
+
+function reportMenuLabel() {
+	const n = reportRowsBadgeCount()
+	return (
+		<span
+			style={{
+				display: "flex",
+				alignItems: "center",
+				justifyContent: "space-between",
+				width: "100%",
+				gap: 8,
+			}}
+		>
+			<span>Отчёт</span>
+			{n > 0 ? (
+				<span className="ms-nav-badge">
+					{n > 9999 ? "9999+" : n.toLocaleString("ru-RU")}
+				</span>
+			) : null}
+		</span>
+	)
+}
 
 export const pages = [
 	{
@@ -32,13 +72,25 @@ export const pages = [
 						path: "report",
 						element: <AutoRuReport />,
 						icon: <TableOutlined />,
-						label: "Отчет",
+						label: reportMenuLabel(),
+					},
+					{
+						path: "competitors",
+						element: <Competitors />,
+						icon: <ShopOutlined />,
+						label: "Конкуренты",
 					},
 					{
 						path: "price-history",
 						element: <PriceHistory />,
 						icon: <LineChartOutlined />,
 						label: "История цен",
+					},
+					{
+						path: "compare",
+						element: <ReportCompare />,
+						icon: <DiffOutlined />,
+						label: "Сравнение",
 					},
 					{
 						path: "settings",
@@ -84,4 +136,46 @@ export function menu(current = pages, parent) {
 			}),
 		}),
 	}
+}
+
+/** Хлебные крошки по дереву меню — без дублирования «Главная / Главная». */
+export function breadcrumbItemsFromPath(pathname) {
+	function walk(items, path) {
+		for (const it of items || []) {
+			if (it.key === path) return [{ title: it.label }]
+			if (it.children?.length) {
+				const inner = walk(it.children, path)
+				if (inner) return [{ title: it.label }, ...inner]
+			}
+		}
+		return null
+	}
+	function labelToTitle(label) {
+		if (label == null || typeof label === "string" || typeof label === "number")
+			return label
+		if (React.isValidElement(label)) {
+			const ch = label.props?.children
+			if (typeof ch === "string" || typeof ch === "number") return ch
+			if (Array.isArray(ch)) {
+				for (const c of ch) {
+					if (typeof c === "string" || typeof c === "number") return c
+					if (
+						React.isValidElement(c) &&
+						typeof c.props?.children === "string"
+					) {
+						return c.props.children
+					}
+				}
+			}
+			if (React.isValidElement(ch) && typeof ch.props?.children === "string") {
+				return ch.props.children
+			}
+		}
+		return "Раздел"
+	}
+	const trail = walk(menu(), pathname)
+	if (trail?.length) {
+		return trail.map((t) => ({ title: labelToTitle(t.title) }))
+	}
+	return [{ title: "Раздел" }]
 }

@@ -24,7 +24,7 @@ import { BrandSettings } from "./BrandSettings.jsx"
 import { CitySettings } from "./CitySettings.jsx"
 import { YearsSettings } from "./YearsSettings.jsx"
 
-const { Text } = Typography
+const { Paragraph, Text, Title } = Typography
 
 export function Settings() {
 	const dispatch = useDispatch()
@@ -157,101 +157,136 @@ export function Settings() {
 			style={{ width: "100%" }}
 			size="large"
 		>
-			<Card>
+			<div className="ms-page-hero">
+				<Title
+					level={2}
+					style={{ marginBottom: 8 }}
+				>
+					Настройки
+				</Title>
+				<Paragraph
+					type="secondary"
+					style={{ marginBottom: 0 }}
+				>
+					Город и годы задают срез для парсинга; бренды и модели ограничивают
+					объём сбора. После изменений нажмите «Применить и сохранить».
+				</Paragraph>
+			</div>
+
+			<Card className="ms-summary-card">
 				<Tabs
 					items={tabItems}
 					defaultActiveKey="city"
 				/>
 			</Card>
 
-			<Space
-				style={{ width: "100%", justifyContent: "flex-start" }}
-				wrap
+			<Card
+				className="ms-toolbar-card"
+				title="Сохранение и данные"
+				size="small"
 			>
-				<Button
-					type="primary"
-					icon={<SaveOutlined />}
-					onClick={handleSave}
-					loading={loading}
+				<Space
+					direction="vertical"
+					style={{ width: "100%" }}
+					size="middle"
 				>
-					Применить и сохранить
-				</Button>
-				<Button
-					icon={<DownloadOutlined />}
-					onClick={handleExport}
-				>
-					Экспорт настроек
-				</Button>
-				<Button
-					icon={<UploadOutlined />}
-					onClick={() => fileInputRef.current?.click()}
-				>
-					Импорт настроек
-				</Button>
-				<input
-					ref={fileInputRef}
-					type="file"
-					accept="application/json"
-					style={{ display: "none" }}
-					onChange={onFileSelected}
-				/>
-				<Button
-					icon={<ReloadOutlined />}
-					onClick={handleReset}
-				>
-					Сбросить
-				</Button>
-				{electron?.priceHistorySeedMock ? (
-					<Button
-						icon={<DatabaseOutlined />}
-						onClick={async () => {
-							const res = await electron.priceHistorySeedMock()
-							if (!res?.ok) {
-								message.error(res?.error || "Ошибка заполнения")
-								return
-							}
-							if (res.skipped) {
-								message.info(
-									"В базе уже есть запуски — демо-данные не добавлены. Очистите историю и повторите.",
-								)
-							} else {
-								message.success(
-									`Демо-данные: запусков ${res.runs ?? 0}, строк ${res.offers ?? 0}`,
-								)
-							}
-						}}
+					<Text type="secondary">
+						Сначала настройте вкладки выше, затем сохраните. Экспорт и импорт
+						переносят JSON между машинами; очистка истории не затрагивает
+						избранное.
+					</Text>
+					<Space
+						wrap
+						style={{ width: "100%" }}
 					>
-						Заполнить тестовыми данными
-					</Button>
-				) : null}
-				{electron?.priceHistoryClear ? (
-					<Button
-						danger
-						icon={<DeleteOutlined />}
-						onClick={() => {
-							Modal.confirm({
-								title: "Очистить историю цен?",
-								content: (
-									<Text type="secondary">
-										Будут удалены все сохранённые запуски и строки из локальной
-										базы. Избранное не затрагивается. Действие необратимо.
-									</Text>
-								),
-								okText: "Очистить",
-								okType: "danger",
-								cancelText: "Отмена",
-								async onOk() {
-									const res = await electron.priceHistoryClear()
-									if (res?.ok) message.success("История очищена")
-									else message.error(res?.error || "Не удалось очистить")
-								},
-							})
-						}}
-					>
-						Очистить историю цен
-					</Button>
-				) : null}
-			</Space>
+						<Button
+							type="primary"
+							icon={<SaveOutlined />}
+							onClick={handleSave}
+							loading={loading}
+							size="large"
+						>
+							Применить и сохранить
+						</Button>
+						<Button
+							icon={<DownloadOutlined />}
+							onClick={handleExport}
+						>
+							Экспорт настроек
+						</Button>
+						<Button
+							icon={<UploadOutlined />}
+							onClick={() => fileInputRef.current?.click()}
+						>
+							Импорт настроек
+						</Button>
+						<input
+							ref={fileInputRef}
+							type="file"
+							accept="application/json"
+							style={{ display: "none" }}
+							onChange={onFileSelected}
+						/>
+						<Button
+							icon={<ReloadOutlined />}
+							onClick={handleReset}
+						>
+							Сбросить
+						</Button>
+						{electron?.priceHistorySeedMock ? (
+							<Button
+								icon={<DatabaseOutlined />}
+								onClick={async () => {
+									const res = await electron.priceHistorySeedMock()
+									if (!res?.ok) {
+										message.error(res?.error || "Ошибка заполнения")
+										return
+									}
+									if (res.skipped) {
+										message.info(
+											"В базе уже есть запуски — демо-данные не добавлены. Очистите историю и повторите.",
+										)
+									} else {
+										message.success(
+											`Демо-данные: запусков ${res.runs ?? 0}, строк ${res.offers ?? 0}`,
+										)
+									}
+								}}
+							>
+								Заполнить тестовыми данными
+							</Button>
+						) : null}
+						{electron?.priceHistoryClear ? (
+							<Button
+								danger
+								icon={<DeleteOutlined />}
+								onClick={() => {
+									Modal.confirm({
+										title: "Очистить историю цен?",
+										content: (
+											<Text type="secondary">
+												Будут удалены все сохранённые запуски и строки из
+												локальной базы. Избранное не затрагивается. Действие
+												необратимо.
+											</Text>
+										),
+										okText: "Очистить",
+										okType: "danger",
+										cancelText: "Отмена",
+										async onOk() {
+											const res = await electron.priceHistoryClear()
+											if (res?.ok) message.success("История очищена")
+											else message.error(res?.error || "Не удалось очистить")
+										},
+									})
+								}}
+							>
+								Очистить историю цен
+							</Button>
+						) : null}
+					</Space>
+				</Space>
+			</Card>
 		</Space>
 	)
 }

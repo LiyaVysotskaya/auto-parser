@@ -1,380 +1,416 @@
-import React, { useMemo } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { useSelector } from "react-redux"
 
-import {
-	BankOutlined,
-	CrownOutlined,
-	FireOutlined,
-	StarOutlined,
-	TrophyOutlined,
-} from "@ant-design/icons"
-import {
-	Badge,
-	Card,
-	Col,
-	Collapse,
-	List,
-	Row,
-	Space,
-	Statistic,
-	Table,
-	Tabs,
-	Tag,
-	Typography,
-} from "antd"
+import { mergeCityOptions } from "@market-slice/application/settings/defaults.js"
+import { Select, Space, Table, Tag, Typography } from "antd"
 
-import { generateComprehensiveAnalytics } from "../../analytics.js"
-import { DealerComparison } from "./DealerComparison.jsx"
+import {
+	filterRowsFlatByCity,
+	flattenReport,
+	generateComprehensiveAnalytics,
+	resolveReportCityScope,
+	uniqueCitiesFromReport,
+} from "../../analytics.js"
 import { FavoriteStar } from "./FavoriteStar.jsx"
-import { TopListCard } from "./TopListCard.jsx"
-import { detailedColumns, topOfferColumns } from "./columns.jsx"
+import { detailedColumns } from "./columns.jsx"
+import { money, pct } from "./report-formatters.js"
 
-const { Title, Text } = Typography
+const { Text } = Typography
 
-function BrandAnalyticsPanel({ brand, data }) {
+function BrandCockpitPanel({ brand, data, modelRows }) {
 	if (!data) return null
-	const {
-		summary,
-		topCheapest,
-		topDiscounts,
-		topValue,
-		topDealers,
-		topModelsByPct,
-	} = data
+	const { summary, topCheapest, topDiscounts } = data
+	const topDisc = topDiscounts?.[0]
+	const bestPct =
+		topDisc?.price && topDisc?.maxDiscount
+			? (topDisc.maxDiscount / topDisc.price) * 100
+			: null
+
+	const top5 = (topCheapest || []).slice(0, 5)
+
+	const top5Cols = [
+		{
+			title: "Поз.",
+			key: "pos",
+			width: 40,
+			render: (_, __, i) => (
+				<span
+					className={`ms-mini-pos ${i === 0 ? "p1" : i === 1 ? "p2" : i === 2 ? "p3" : ""}`}
+				>
+					{i + 1}
+				</span>
+			),
+		},
+		{
+			title: "Бренд",
+			dataIndex: "brand",
+			width: 72,
+			render: (b) => <span className="ms-chip ms-chip-blue">{b}</span>,
+		},
+		{
+			title: "Модель",
+			dataIndex: "model",
+			ellipsis: true,
+			render: (m) => <b>{m}</b>,
+		},
+		{
+			title: "Комплектация",
+			key: "eq",
+			ellipsis: true,
+			render: (_, r) => (
+				<span style={{ fontSize: 12 }}>
+					{r.equipment} · {r.modification} · {r.year}
+				</span>
+			),
+		},
+		{
+			title: "Цена",
+			dataIndex: "price",
+			width: 96,
+			render: (v) => <span className="ms-text-amber">{money(v)}</span>,
+		},
+		{
+			title: "Скидка",
+			dataIndex: "maxDiscount",
+			width: 100,
+			render: (d, r) =>
+				d ? (
+					<span className="ms-chip ms-chip-red">
+						−{Number(d).toLocaleString("ru-RU")} ₽
+					</span>
+				) : (
+					"—"
+				),
+		},
+		{
+			title: "Итог",
+			key: "fin",
+			width: 96,
+			render: (_, r) => {
+				const fin = (r.price || 0) - (r.maxDiscount || 0)
+				return <span className="ms-text-green">{money(fin)}</span>
+			},
+		},
+		{ title: "Дилер", dataIndex: "dealer", ellipsis: true },
+	]
+
+	const detailedWithFavorite = [
+		{
+			title: "",
+			key: "fav",
+			width: 40,
+			fixed: "left",
+			render: (_, rec) => <FavoriteStar row={rec} />,
+		},
+		...detailedColumns,
+	]
 
 	return (
 		<Space
 			direction="vertical"
-			size="middle"
 			style={{ width: "100%" }}
+			size={12}
 		>
-			<Row gutter={16}>
-				<Col
-					xs={12}
-					sm={6}
-				>
-					<Statistic
-						title="Предложений (бренд)"
-						value={summary.totalOffers}
-						prefix={<FireOutlined />}
-						valueStyle={{ color: "#cf1322" }}
-					/>
-				</Col>
-				<Col
-					xs={12}
-					sm={6}
-				>
-					<Statistic
-						title="Средняя цена"
-						value={Math.round(summary.avgPrice)}
-						prefix="₽"
-						valueStyle={{ color: "#389e0d" }}
-					/>
-				</Col>
-				<Col
-					xs={12}
-					sm={6}
-				>
-					<Statistic
-						title="Мин. цена"
-						value={summary.minPrice}
-						prefix="₽"
-						valueStyle={{ color: "#52c41a" }}
-					/>
-				</Col>
-				<Col
-					xs={12}
-					sm={6}
-				>
-					<Statistic
-						title="Макс. скидка"
-						value={summary.maxDiscount}
-						prefix="₽"
-						valueStyle={{ color: "#faad14" }}
-					/>
-				</Col>
-			</Row>
-
-			<TopListCard
-				icon={<CrownOutlined />}
-				title="Топ-15 по цене"
-				data={topCheapest}
-				columns={topOfferColumns}
-			/>
-			<TopListCard
-				icon={<TrophyOutlined />}
-				title="Топ-15 по скидкам"
-				data={topDiscounts}
-				columns={topOfferColumns}
-			/>
-			<TopListCard
-				icon={<StarOutlined />}
-				title="Топ-15 по выгоде"
-				data={topValue}
-				columns={topOfferColumns}
-			/>
-
-			<Row gutter={16}>
-				<Col
-					xs={24}
-					md={12}
-				>
-					<Card
-						size="small"
-						title="Топ-10 моделей по % скидке"
-						style={{ marginBottom: 12 }}
+			<div className="ms-cockpit-g3">
+				<div className="ms-stat-tile">
+					<Text
+						type="secondary"
+						style={{ fontSize: 11, textTransform: "uppercase" }}
 					>
-						<List
-							dataSource={topModelsByPct}
-							locale={{ emptyText: "Нет данных" }}
-							renderItem={(it, idx) => (
-								<List.Item key={`${brand}-${it.model}-${idx}`}>
-									<Space
-										style={{ width: "100%", justifyContent: "space-between" }}
-									>
-										<div>
-											<Badge
-												count={idx + 1}
-												style={{ marginRight: 8 }}
-											/>
-											<b>{it.model}</b>
-											<Text
-												type="secondary"
-												style={{ fontSize: 12, display: "block" }}
-											>
-												{it.equipment} • дилер:{" "}
-												{it.priceMinDealer ?? it.minDealer ?? "—"}
-											</Text>
-										</div>
-										<div style={{ textAlign: "right" }}>
-											<Tag color="red">
-												{it.bestDiscountPct
-													? (it.bestDiscountPct * 100).toFixed(1) + "%"
-													: "—"}
-											</Tag>
-											<div style={{ fontSize: 12 }}>
-												{it.bestDiscountAbs
-													? Number(it.bestDiscountAbs).toLocaleString() + " ₽"
-													: "—"}
-											</div>
-											<Text
-												type="secondary"
-												style={{ fontSize: 11, display: "block" }}
-											>
-												итог:{" "}
-												{it.priceMin
-													? Number(it.priceMin).toLocaleString() + " ₽"
-													: "—"}
-											</Text>
-										</div>
-									</Space>
-								</List.Item>
-							)}
-						/>
-					</Card>
-				</Col>
-
-				<Col
-					xs={24}
-					md={12}
-				>
-					<Card
-						title="Топ-10 дилеров"
-						size="small"
+						Предложений
+					</Text>
+					<div className="ms-stat-tile-val ms-val-blue">
+						{summary.totalOffers.toLocaleString("ru-RU")}
+					</div>
+				</div>
+				<div className="ms-stat-tile">
+					<Text
+						type="secondary"
+						style={{ fontSize: 11, textTransform: "uppercase" }}
 					>
-						<List
-							size="small"
-							dataSource={topDealers}
-							locale={{ emptyText: "Нет данных" }}
-							renderItem={(dealer, index) => (
-								<List.Item>
-									<Space
-										style={{ width: "100%", justifyContent: "space-between" }}
-									>
-										<div>
-											<Badge
-												count={index + 1}
-												style={{
-													backgroundColor: index < 3 ? "#ff4d4f" : "#1890ff",
-													marginRight: 8,
-												}}
-											/>
-											<BankOutlined style={{ marginRight: 8 }} />
-											{dealer.dealer}
-										</div>
-										<Text strong>
-											{(dealer.units ?? dealer.count ?? 0).toLocaleString()} шт.
-										</Text>
-									</Space>
-								</List.Item>
-							)}
-						/>
-					</Card>
-				</Col>
-			</Row>
+						Мин. цена
+					</Text>
+					<div className="ms-stat-tile-val ms-val-green">
+						{money(summary.minPrice)}
+					</div>
+				</div>
+				<div className="ms-stat-tile">
+					<Text
+						type="secondary"
+						style={{ fontSize: 11, textTransform: "uppercase" }}
+					>
+						Лучшая скидка
+					</Text>
+					<div className="ms-stat-tile-val ms-val-red">
+						{money(summary.maxDiscount)}
+					</div>
+					{bestPct != null ? (
+						<div className="ms-stat-delta ms-stat-delta--muted">
+							{bestPct.toFixed(0)}%
+						</div>
+					) : null}
+				</div>
+			</div>
+
+			<div
+				className="ms-dash-card ant-card ant-card-bordered"
+				style={{ padding: 0 }}
+			>
+				<div
+					className="ms-card-hd"
+					style={{ padding: "12px 14px 0" }}
+				>
+					Топ-5 по цене — {brand}
+				</div>
+				<div style={{ padding: "0 8px 12px" }}>
+					<Table
+						className="ms-table-polished"
+						size="small"
+						pagination={false}
+						columns={top5Cols}
+						dataSource={top5}
+						rowKey={(r, i) => `${r.brand}-${r.model}-${i}`}
+						scroll={{ x: 720 }}
+					/>
+				</div>
+			</div>
+
+			<div
+				className="ms-dash-card ant-card ant-card-bordered"
+				style={{ padding: 0 }}
+			>
+				<div
+					className="ms-card-hd"
+					style={{ padding: "12px 14px 0" }}
+				>
+					Детальная аналитика — модели {brand}
+				</div>
+				<div style={{ padding: "0 8px 12px" }}>
+					<Table
+						className="ms-table-polished"
+						size="small"
+						columns={detailedWithFavorite}
+						dataSource={modelRows || []}
+						rowKey={(r) =>
+							`${r.brand}::${r.model}::${r.equipment}::${r.modification}::${r.year}::${r.city || "—"}`
+						}
+						pagination={{ pageSize: 10, showSizeChanger: true }}
+						scroll={{ x: 900 }}
+					/>
+				</div>
+			</div>
 		</Space>
 	)
 }
 
 export function AutoRuReport() {
 	const report = useSelector((state) => state.autoRu.report || [])
-	const detailedWithFavorite = useMemo(
-		() => [
-			{
-				title: "",
-				key: "fav",
-				width: 44,
-				fixed: "left",
-				render: (_, rec) => <FavoriteStar row={rec} />,
-			},
-			...detailedColumns,
-		],
-		[],
-	)
+	const settings = useSelector((state) => state.settings)
+	const cityIds = useMemo(() => uniqueCitiesFromReport(report), [report])
+	const cityOptions = useMemo(() => {
+		const opts = mergeCityOptions(settings.extraCities ?? [])
+		return cityIds.map((id) => ({
+			value: id,
+			label: opts.find((c) => c.id === id)?.name || id,
+		}))
+	}, [cityIds, settings.extraCities])
+
+	const [cityOverride, setCityOverride] = useState(null)
+	const [brandTab, setBrandTab] = useState(null)
+
+	useEffect(() => {
+		const ids = uniqueCitiesFromReport(report)
+		setCityOverride((prev) => (prev && ids.includes(prev) ? prev : null))
+	}, [report])
+
+	const effectiveScopeCity = useMemo(() => {
+		if (!cityIds.length) return null
+		if (cityOverride && cityIds.includes(cityOverride)) return cityOverride
+		return resolveReportCityScope(report, settings) ?? cityIds[0]
+	}, [report, settings, cityOverride, cityIds])
+
 	const analytics = useMemo(
-		() => generateComprehensiveAnalytics(report),
-		[report],
+		() => generateComprehensiveAnalytics(report, { city: effectiveScopeCity }),
+		[report, effectiveScopeCity],
 	)
 
 	const { summary, perBrand, perBrandAnalytics } = analytics
-
 	const brandKeys = Object.keys(perBrand).sort()
 
-	const tabItems = brandKeys.map((brand) => ({
-		key: brand,
-		label: brand,
-		children: (
-			<BrandAnalyticsPanel
-				brand={brand}
-				data={perBrandAnalytics[brand]}
-			/>
-		),
-	}))
+	useEffect(() => {
+		if (!brandKeys.length) {
+			setBrandTab(null)
+			return
+		}
+		setBrandTab((prev) =>
+			prev && brandKeys.includes(prev) ? prev : brandKeys[0],
+		)
+	}, [brandKeys])
 
 	return (
-		<div style={{ padding: 16, minHeight: "100vh" }}>
-			<Card style={{ marginBottom: 16 }}>
-				<Title
-					level={2}
-					style={{ marginBottom: 24 }}
+		<div style={{ minHeight: "100%" }}>
+			<Text
+				type="secondary"
+				style={{ display: "block", marginBottom: 10, fontSize: 12 }}
+			>
+				Сводка в рамках выбранного города — без смешивания регионов.
+			</Text>
+			{cityIds.length > 1 ? (
+				<Space
+					wrap
+					align="center"
+					style={{ marginBottom: 12 }}
 				>
-					Аналитика
-				</Title>
-
+					<Text strong>Город:</Text>
+					<Select
+						style={{ minWidth: 220 }}
+						value={effectiveScopeCity}
+						options={cityOptions}
+						onChange={(v) => setCityOverride(v)}
+					/>
+				</Space>
+			) : cityIds.length === 1 ? (
 				<Text
 					type="secondary"
-					style={{ display: "block", marginBottom: 16 }}
+					style={{ display: "block", marginBottom: 12, fontSize: 12 }}
 				>
-					Сводка ниже — по всему отчёту. Топы по цене, скидкам и дилерам
-					считаются отдельно внутри каждого бренда.
+					Город: {cityOptions[0]?.label ?? cityIds[0]}
 				</Text>
+			) : null}
 
-				<Row gutter={16}>
-					<Col
-						xs={12}
-						sm={6}
+			<div
+				className="ms-stat-grid"
+				style={{ marginBottom: 14 }}
+			>
+				<div className="ms-stat-tile">
+					<Text
+						type="secondary"
+						style={{ fontSize: 11, textTransform: "uppercase" }}
 					>
-						<Statistic
-							title="Всего предложений"
-							value={summary.totalOffers}
-							prefix={<FireOutlined />}
-							valueStyle={{ color: "#cf1322" }}
-						/>
-					</Col>
-					<Col
-						xs={12}
-						sm={6}
+						Всего предложений
+					</Text>
+					<div className="ms-stat-tile-val ms-val-blue">
+						{summary.totalOffers.toLocaleString("ru-RU")}
+					</div>
+				</div>
+				<div className="ms-stat-tile">
+					<Text
+						type="secondary"
+						style={{ fontSize: 11, textTransform: "uppercase" }}
 					>
-						<Statistic
-							title="Средняя цена"
-							value={Math.round(summary.avgPrice)}
-							prefix="₽"
-							valueStyle={{ color: "#389e0d" }}
-						/>
-					</Col>
-					<Col
-						xs={12}
-						sm={6}
+						Средняя цена
+					</Text>
+					<div className="ms-stat-tile-val ms-val-amber">
+						{money(Math.round(summary.avgPrice))}
+					</div>
+				</div>
+				<div className="ms-stat-tile">
+					<Text
+						type="secondary"
+						style={{ fontSize: 11, textTransform: "uppercase" }}
 					>
-						<Statistic
-							title="Минимальная цена"
-							value={summary.minPrice}
-							prefix="₽"
-							valueStyle={{ color: "#52c41a" }}
-						/>
-					</Col>
-					<Col
-						xs={12}
-						sm={6}
+						Мин. цена
+					</Text>
+					<div className="ms-stat-tile-val ms-val-green">
+						{money(summary.minPrice)}
+					</div>
+				</div>
+				<div className="ms-stat-tile">
+					<Text
+						type="secondary"
+						style={{ fontSize: 11, textTransform: "uppercase" }}
 					>
-						<Statistic
-							title="Макс. скидка"
-							value={summary.maxDiscount}
-							prefix="₽"
-							valueStyle={{ color: "#faad14" }}
-						/>
-					</Col>
-				</Row>
-			</Card>
+						Макс. скидка
+					</Text>
+					<div className="ms-stat-tile-val ms-val-red">
+						{money(summary.maxDiscount)}
+					</div>
+				</div>
+			</div>
 
-			{brandKeys.length > 0 ? (
-				<Card
-					style={{ marginBottom: 16 }}
-					title="По брендам"
-				>
-					<Tabs
-						items={tabItems}
-						defaultActiveKey={brandKeys[0]}
+			{brandKeys.length > 0 && brandTab ? (
+				<>
+					<div
+						className="ms-tabs-bar"
+						style={{ marginBottom: 12 }}
+					>
+						{brandKeys.map((b) => (
+							<button
+								key={b}
+								type="button"
+								className={`ms-tab-btn ${brandTab === b ? "active" : ""}`}
+								onClick={() => setBrandTab(b)}
+							>
+								{b}
+							</button>
+						))}
+					</div>
+					<BrandCockpitPanel
+						brand={brandTab}
+						data={perBrandAnalytics[brandTab]}
+						modelRows={perBrand[brandTab]?.models ?? []}
 					/>
-				</Card>
+				</>
 			) : (
-				<Card style={{ marginBottom: 16 }}>
-					<Text type="secondary">Нет данных для отчёта</Text>
-				</Card>
+				<Text type="secondary">Нет данных — загрузите отчёт на главной.</Text>
 			)}
 
-			<Card title="Детальная аналитика по брендам и моделям">
-				{brandKeys.length === 0 ? (
-					<Text type="secondary">Нет данных</Text>
-				) : (
-					<Collapse
-						defaultActiveKey={brandKeys.slice(0, 3)}
-						items={brandKeys.map((brand) => ({
-							key: brand,
-							label: (
-								<Space>
-									<strong>{brand}</strong>
-									<Tag color="blue">
-										{perBrand[brand].models.length} моделей
-									</Tag>
-									<Tag color="green">
+			<div
+				style={{ marginTop: 16 }}
+				className="ms-dash-card ant-card ant-card-bordered"
+			>
+				<div
+					className="ms-card-hd"
+					style={{ padding: "12px 14px 0" }}
+				>
+					Справочник по моделям
+				</div>
+				<div style={{ padding: "8px 14px 14px" }}>
+					{brandKeys.length === 0 ? (
+						<Text type="secondary">Нет данных</Text>
+					) : (
+						brandKeys.map((brand) => (
+							<div
+								key={brand}
+								style={{ marginBottom: 16 }}
+							>
+								<Space
+									wrap
+									style={{ marginBottom: 8 }}
+								>
+									<Text strong>{brand}</Text>
+									<Tag>{perBrand[brand].models.length} моделей</Tag>
+									<Tag color="success">
 										{perBrand[brand].models.reduce(
-											(sum, m) => sum + m.totalOffers,
+											(s, m) => s + m.totalOffers,
 											0,
 										)}{" "}
 										предложений
 									</Tag>
 								</Space>
-							),
-							children: (
 								<Table
+									className="ms-table-polished"
 									size="small"
-									columns={detailedWithFavorite}
+									columns={[
+										{
+											title: "",
+											key: "fav",
+											width: 40,
+											render: (_, rec) => <FavoriteStar row={rec} />,
+										},
+										...detailedColumns,
+									]}
 									dataSource={perBrand[brand].models}
 									rowKey={(r) =>
 										`${r.brand}::${r.model}::${r.equipment}::${r.modification}::${r.year}::${r.city || "—"}`
 									}
-									pagination={{ pageSize: 10, showSizeChanger: true }}
+									pagination={{ pageSize: 8, showSizeChanger: true }}
 									scroll={{ x: 800 }}
 								/>
-							),
-						}))}
-					/>
-				)}
-			</Card>
-
-			<div style={{ marginTop: 16 }}>
-				<DealerComparison report={report} />
+							</div>
+						))
+					)}
+				</div>
 			</div>
 		</div>
 	)

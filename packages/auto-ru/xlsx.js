@@ -164,7 +164,7 @@ export function xlsx(report) {
 }
 
 export function reportName(report, extension) {
-	const date = dateFns.format(new Date(), "dd_MM_yyyy")
+	const date = dateFns.format(new Date(), "dd MM yyyy")
 	const brands = report
 		.map((tab) => tab.name)
 		.filter(Boolean)

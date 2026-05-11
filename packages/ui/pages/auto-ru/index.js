@@ -167,7 +167,7 @@ export function AutoRu() {
 
 	const last = autoRuState.lastRun || {}
 	const lastStart = last.startIso
-		? dateFns.format(new Date(last.startIso), "dd.MM.yyyy HH:mm")
+		? dateFns.format(new Date(last.startIso), "dd MM yyyy HH:mm")
 		: "—"
 	const lastDuration = formatDuration(last.durationMs)
 
@@ -237,7 +237,7 @@ export function AutoRu() {
 				const pts = [...byRun.entries()]
 					.sort((a, b) => a[0].localeCompare(b[0]))
 					.map(([started, m]) => ({
-						label: dateFns.format(new Date(started), "d.MM"),
+						label: dateFns.format(new Date(started), "dd MM yyyy"),
 						value: Math.round(m.price / 1000),
 						brand: m.brand,
 						model: m.model,
@@ -748,7 +748,7 @@ export function AutoRu() {
 								<span className={`ms-log-tag ms-log-tag--${r.level || "info"}`}>
 									[{String(r.level || "info").toUpperCase()}]
 								</span>{" "}
-								{dateFns.format(new Date(r.timestamp), "HH:mm:ss")} —{" "}
+								{dateFns.format(new Date(r.timestamp), "dd MM yyyy HH:mm:ss")} —{" "}
 								{r.message}
 							</div>
 						))

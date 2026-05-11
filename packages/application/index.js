@@ -83,7 +83,7 @@ function render() {
 		switch (record.level) {
 			case "error":
 				console.info(
-					dateFns.format(new Date(record.timestamp), "dd.MM.yyyy HH:mm:ss"),
+					dateFns.format(new Date(record.timestamp), "dd MM yyyy HH:mm:ss"),
 					...formatScope(record.scope),
 					...formatStatus(record.level),
 				)
@@ -94,7 +94,7 @@ function render() {
 			case "info":
 			case "success":
 				console.info(
-					dateFns.format(new Date(record.timestamp), "dd.MM.yyyy HH:mm:ss"),
+					dateFns.format(new Date(record.timestamp), "dd MM yyyy HH:mm:ss"),
 					...formatScope(record.scope),
 					...formatStatus(record.level),
 					record.message,
@@ -102,7 +102,7 @@ function render() {
 				break
 			case "warning":
 				console.info(
-					dateFns.format(new Date(record.timestamp), "dd.MM.yyyy HH:mm:ss"),
+					dateFns.format(new Date(record.timestamp), "dd MM yyyy HH:mm:ss"),
 					...formatScope(record.scope),
 					...formatStatus(record.level),
 				)

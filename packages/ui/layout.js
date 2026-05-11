@@ -147,7 +147,7 @@ export function Layout() {
 									{ type: "text/plain" },
 								),
 							))
-							a.download = `${dateFns.format(new Date(), "dd_MM_yyyy_HH_mm")}.log`
+							a.download = `${dateFns.format(new Date(), "dd MM yyyy HH mm")}.log`
 							document.body.appendChild(a)
 							a.click()
 							document.body.removeChild(a)

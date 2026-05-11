@@ -2,7 +2,7 @@ import React from "react"
 
 import { PriceHistory } from "./PriceHistory.jsx"
 
-/** Отдельный экран как в HTML-прототипе: сразу вкладка «Сравнение отчётов». */
+/** Тот же экран «История цен» (для маршрута сравнения в меню). */
 export function ReportCompare() {
-	return <PriceHistory initialTab="diff" />
+	return <PriceHistory />
 }

@@ -6,9 +6,18 @@ import { money, pct } from "./report-formatters.js"
 
 const { Text } = Typography
 
+function carSpecDealerTooltip(record, dealerKey) {
+	const dealer = record[dealerKey] || "—"
+	return (
+		<Text style={{ fontSize: 12, color: "var(--ant-color-text-light-solid)" }}>
+			Дилер: {dealer}
+		</Text>
+	)
+}
+
 export const topOfferColumns = [
 	{
-		title: "Поз.",
+		title: "",
 		dataIndex: "position",
 		key: "position",
 		width: 50,
@@ -105,86 +114,96 @@ export const topOfferColumns = [
 	},
 ]
 
-export const detailedColumns = [
-	{
-		title: "Модель",
-		dataIndex: "model",
-		key: "model",
-		render: (_v, rec) => (
-			<div>
-				<b>{rec.model}</b>
-				<Text type="secondary" style={{ fontSize: 12, display: "block" }}>
-					{rec.equipment} • {rec.modification} • {rec.year}
-				</Text>
-			</div>
+export function buildDetailedColumns(opts = {}) {
+	const getCityLabel =
+		typeof opts.getCityLabel === "function"
+			? opts.getCityLabel
+			: (id) => String(id ?? "")
+	const rows = Array.isArray(opts.filterRows) ? opts.filterRows : []
+	const models = [
+		...new Set(rows.map((r) => r.model).filter((m) => m != null && String(m))),
+	].sort((a, b) => String(a).localeCompare(String(b), "ru"))
+	const cityIds = [
+		...new Set(
+			rows
+				.map((r) => r.city)
+				.filter((c) => c != null && String(c).trim() !== "" && c !== "—"),
 		),
-		fixed: "left",
-		width: 200,
-	},
-	{
-		title: "Мин. цена",
-		dataIndex: "minPrice",
-		key: "minPrice",
-		width: 100,
-		render: (v, record) => (
-			<Tooltip title={`Дилер: ${record.minDealer || "—"}`}>
-				<Text
-					strong
-					type="success"
-				>
-					{money(v)}
-				</Text>
-			</Tooltip>
-		),
-	},
-	{
-		title: "2-я цена",
-		dataIndex: "secondPrice",
-		key: "secondPrice",
-		width: 100,
-		render: (v, record) => (
-			<Tooltip title={`Дилер: ${record.secondDealer || "—"}`}>{money(v)}</Tooltip>
-		),
-	},
-	{
-		title: "Разрыв",
-		dataIndex: "priceGapPct",
-		key: "priceGapPct",
-		width: 90,
-		render: (v) =>
-			v ? (
-				<Tag color={v > 0.05 ? "volcano" : "orange"}>
-					{(v * 100).toFixed(1)}%
-				</Tag>
-			) : (
-				"—"
+	].sort((a, b) => String(a).localeCompare(String(b), "ru"))
+
+	return [
+		{
+			title: "Модель",
+			dataIndex: "model",
+			key: "model",
+			filters: models.map((m) => ({ text: String(m), value: m })),
+			onFilter: (value, rec) => rec.model === value,
+			filterSearch: true,
+			render: (_v, rec) => (
+				<div>
+					<b>{rec.model}</b>
+					<Text type="secondary" style={{ fontSize: 12, display: "block" }}>
+						{rec.equipment} • {rec.modification} • {rec.year}
+					</Text>
+				</div>
 			),
-	},
-	{
-		title: "Мин. возможная",
-		dataIndex: "priceMin",
-		key: "priceMin",
-		width: 110,
-		render: (v, record) => (
-			<Tooltip title={`Дилер: ${record.priceMinDealer || "—"}`}>
-				<Text type="secondary">{money(v)}</Text>
-			</Tooltip>
-		),
-	},
-	{
-		title: "Лучшая скидка",
-		dataIndex: "bestDiscountAbs",
-		key: "bestDiscountAbs",
-		width: 120,
-		render: (v, r) => (
-			<div>
-				<Tag color={r.bestDiscountPct >= 0.1 ? "red" : "gold"}>{money(v)}</Tag>
-				<Text type="secondary" style={{ fontSize: 11, display: "block" }}>
-					{pct(r.bestDiscountPct)}
-				</Text>
-			</div>
-		),
-	},
+			fixed: "left",
+			width: 200,
+		},
+		{
+			title: "Мин. цена",
+			dataIndex: "minPrice",
+			key: "minPrice",
+			width: 100,
+			render: (v, record) => (
+				<Tooltip title={`Дилер: ${record.minDealer || "—"}`}>{money(v)}</Tooltip>
+			),
+		},
+		{
+			title: "2-я цена",
+			dataIndex: "secondPrice",
+			key: "secondPrice",
+			width: 100,
+			render: (v, record) => (
+				<Tooltip title={`Дилер: ${record.secondDealer || "—"}`}>{money(v)}</Tooltip>
+			),
+		},
+		{
+			title: "Разрыв",
+			dataIndex: "priceGapPct",
+			key: "priceGapPct",
+			width: 90,
+			render: (v) =>
+				v ? (
+					<Tag color={v > 0.05 ? "volcano" : "orange"}>
+						{(v * 100).toFixed(1)}%
+					</Tag>
+				) : (
+					"—"
+				),
+		},
+		{
+			title: "Мин. возможная",
+			dataIndex: "priceMin",
+			key: "priceMin",
+			width: 110,
+			render: (v, record) => (
+				<Tooltip title={`Дилер: ${record.priceMinDealer || "—"}`}>
+					<Text type="secondary">{money(v)}</Text>
+				</Tooltip>
+			),
+		},
+		{
+			title: "Лучшая скидка",
+			dataIndex: "bestDiscountAbs",
+			key: "bestDiscountAbs",
+			width: 120,
+			render: (v, r) => (
+				<Tooltip title={`Дилер: ${r.bestDiscountDealer || "—"}`}>
+					<Tag color={r.bestDiscountPct >= 0.1 ? "red" : "gold"}>{money(v)}</Tag>
+				</Tooltip>
+			),
+		},
 		{
 			title: "Предложений",
 			dataIndex: "totalOffers",
@@ -204,6 +223,18 @@ export const detailedColumns = [
 			key: "city",
 			width: 100,
 			ellipsis: true,
-			render: (city) => (city && city !== "—" ? <Tag>{city}</Tag> : "—"),
+			filters: cityIds.map((id) => ({
+				text: getCityLabel(String(id)),
+				value: id,
+			})),
+			onFilter: (value, rec) => String(rec.city ?? "") === String(value ?? ""),
+			filterSearch: true,
+			render: (city) =>
+				city && city !== "—" ? (
+					<Tag>{getCityLabel(String(city))}</Tag>
+				) : (
+					"—"
+				),
 		},
 	]
+}

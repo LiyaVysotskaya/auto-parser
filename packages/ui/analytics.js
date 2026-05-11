@@ -215,6 +215,7 @@ export function groupByModel(rowsFlat) {
 			avgPrice: avgWeighted,
 			bestDiscountAbs,
 			bestDiscountPct,
+			bestDiscountDealer: bestDiscountEntry?.dealer ?? null,
 			rows,
 		}
 	})

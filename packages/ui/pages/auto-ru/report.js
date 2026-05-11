@@ -2,35 +2,107 @@ import React, { useEffect, useMemo, useState } from "react"
 import { useSelector } from "react-redux"
 
 import { mergeCityOptions } from "@market-slice/application/settings/defaults.js"
-import { Select, Space, Table, Tag, Typography } from "antd"
+import { Input, Select, Space, Table, Tag, Tooltip, Typography } from "antd"
 
 import {
-	filterRowsFlatByCity,
-	flattenReport,
 	generateComprehensiveAnalytics,
 	resolveReportCityScope,
 	uniqueCitiesFromReport,
 } from "../../analytics.js"
 import { FavoriteStar } from "./FavoriteStar.jsx"
-import { detailedColumns } from "./columns.jsx"
-import { money, pct } from "./report-formatters.js"
+import { buildDetailedColumns } from "./columns.jsx"
+import { money } from "./report-formatters.js"
 
 const { Text } = Typography
 
-function BrandCockpitPanel({ brand, data, modelRows }) {
+function offerTooltipContent(offer) {
+	if (!offer) return "Нет данных по этому показателю"
+	const title = [offer.brand, offer.model].filter(Boolean).join(" ").trim()
+	const spec = [offer.equipment, offer.modification, offer.year]
+		.filter((x) => x != null && String(x).trim() !== "")
+		.join(" · ")
+	return (
+		<div style={{ maxWidth: 300 }}>
+			{title ? (
+				<div>
+					<b>{title}</b>
+				</div>
+			) : null}
+			{spec ? <div style={{ fontSize: 12, marginTop: 4 }}>{spec}</div> : null}
+			<div style={{ marginTop: 8 }}>Дилер: {offer.dealer || "—"}</div>
+		</div>
+	)
+}
+
+function BrandCockpitPanel({ brand, data, modelRows, getCityLabel }) {
+	const [pageSize, setPageSize] = useState(10)
+	const [page, setPage] = useState(1)
+	const [searchText, setSearchText] = useState("")
+
+	useEffect(() => {
+		setPage(1)
+	}, [brand])
+
+	useEffect(() => {
+		setPage(1)
+	}, [searchText])
+
+	const filteredModelRows = useMemo(() => {
+		const rows = modelRows || []
+		const q = searchText.trim().toLowerCase()
+		if (!q) return rows
+		return rows.filter((r) => {
+			const blob = [
+				r.model,
+				r.equipment,
+				r.modification,
+				r.year,
+				r.city,
+				getCityLabel(String(r.city ?? "")),
+				r.minDealer,
+				r.secondDealer,
+				r.priceMinDealer,
+				r.bestDiscountDealer,
+			]
+				.join(" ")
+				.toLowerCase()
+			return blob.includes(q)
+		})
+	}, [modelRows, searchText, getCityLabel])
+
+	const detailedCols = useMemo(
+		() =>
+			buildDetailedColumns({
+				getCityLabel,
+				filterRows: modelRows || [],
+			}),
+		[getCityLabel, modelRows],
+	)
+
+	const detailedWithFavorite = useMemo(
+		() => [
+			{
+				title: "",
+				key: "fav",
+				width: 40,
+				fixed: "left",
+				render: (_, rec) => <FavoriteStar row={rec} />,
+			},
+			...detailedCols,
+		],
+		[detailedCols],
+	)
+
 	if (!data) return null
 	const { summary, topCheapest, topDiscounts } = data
-	const topDisc = topDiscounts?.[0]
-	const bestPct =
-		topDisc?.price && topDisc?.maxDiscount
-			? (topDisc.maxDiscount / topDisc.price) * 100
-			: null
+	const cheapestOffer = topCheapest?.[0]
+	const topDiscOffer = topDiscounts?.[0]
 
 	const top5 = (topCheapest || []).slice(0, 5)
 
 	const top5Cols = [
 		{
-			title: "Поз.",
+			title: "",
 			key: "pos",
 			width: 40,
 			render: (_, __, i) => (
@@ -94,17 +166,6 @@ function BrandCockpitPanel({ brand, data, modelRows }) {
 		{ title: "Дилер", dataIndex: "dealer", ellipsis: true },
 	]
 
-	const detailedWithFavorite = [
-		{
-			title: "",
-			key: "fav",
-			width: 40,
-			fixed: "left",
-			render: (_, rec) => <FavoriteStar row={rec} />,
-		},
-		...detailedColumns,
-	]
-
 	return (
 		<Space
 			direction="vertical"
@@ -123,33 +184,38 @@ function BrandCockpitPanel({ brand, data, modelRows }) {
 						{summary.totalOffers.toLocaleString("ru-RU")}
 					</div>
 				</div>
-				<div className="ms-stat-tile">
-					<Text
-						type="secondary"
-						style={{ fontSize: 11, textTransform: "uppercase" }}
+				<Tooltip title={offerTooltipContent(cheapestOffer)}>
+					<div
+						className="ms-stat-tile ms-stat-tile--hoverable"
+						role="presentation"
 					>
-						Мин. цена
-					</Text>
-					<div className="ms-stat-tile-val ms-val-green">
-						{money(summary.minPrice)}
-					</div>
-				</div>
-				<div className="ms-stat-tile">
-					<Text
-						type="secondary"
-						style={{ fontSize: 11, textTransform: "uppercase" }}
-					>
-						Лучшая скидка
-					</Text>
-					<div className="ms-stat-tile-val ms-val-red">
-						{money(summary.maxDiscount)}
-					</div>
-					{bestPct != null ? (
-						<div className="ms-stat-delta ms-stat-delta--muted">
-							{bestPct.toFixed(0)}%
+						<Text
+							type="secondary"
+							style={{ fontSize: 11, textTransform: "uppercase" }}
+						>
+							Мин. цена
+						</Text>
+						<div className="ms-stat-tile-val ms-val-green">
+							{money(summary.minPrice)}
 						</div>
-					) : null}
-				</div>
+					</div>
+				</Tooltip>
+				<Tooltip title={offerTooltipContent(topDiscOffer)}>
+					<div
+						className="ms-stat-tile ms-stat-tile--hoverable"
+						role="presentation"
+					>
+						<Text
+							type="secondary"
+							style={{ fontSize: 11, textTransform: "uppercase" }}
+						>
+							Лучшая скидка
+						</Text>
+						<div className="ms-stat-tile-val ms-val-red">
+							{money(summary.maxDiscount)}
+						</div>
+					</div>
+				</Tooltip>
 			</div>
 
 			<div
@@ -158,11 +224,11 @@ function BrandCockpitPanel({ brand, data, modelRows }) {
 			>
 				<div
 					className="ms-card-hd"
-					style={{ padding: "12px 14px 0" }}
+					style={{ padding: "12px 16px 0" }}
 				>
 					Топ-5 по цене — {brand}
 				</div>
-				<div style={{ padding: "0 8px 12px" }}>
+				<div style={{ padding: "0 16px 14px" }}>
 					<Table
 						className="ms-table-polished"
 						size="small"
@@ -170,7 +236,9 @@ function BrandCockpitPanel({ brand, data, modelRows }) {
 						columns={top5Cols}
 						dataSource={top5}
 						rowKey={(r, i) => `${r.brand}-${r.model}-${i}`}
-						scroll={{ x: 720 }}
+						scroll={{ x: "max-content" }}
+						tableLayout="auto"
+						style={{ width: "100%" }}
 					/>
 				</div>
 			</div>
@@ -181,21 +249,49 @@ function BrandCockpitPanel({ brand, data, modelRows }) {
 			>
 				<div
 					className="ms-card-hd"
-					style={{ padding: "12px 14px 0" }}
+					style={{
+						padding: "12px 16px 0",
+						display: "flex",
+						flexWrap: "wrap",
+						alignItems: "center",
+						justifyContent: "space-between",
+						gap: 10,
+					}}
 				>
-					Детальная аналитика — модели {brand}
+					<span>Детальная аналитика — модели {brand}</span>
+					<Input.Search
+						allowClear
+						placeholder="Поиск по модели, комплектации, дилеру…"
+						style={{ minWidth: 220, maxWidth: 360 }}
+						value={searchText}
+						onChange={(e) => setSearchText(e.target.value)}
+					/>
 				</div>
-				<div style={{ padding: "0 8px 12px" }}>
+				<div style={{ padding: "0 16px 14px" }}>
 					<Table
 						className="ms-table-polished"
 						size="small"
 						columns={detailedWithFavorite}
-						dataSource={modelRows || []}
+						dataSource={filteredModelRows}
 						rowKey={(r) =>
 							`${r.brand}::${r.model}::${r.equipment}::${r.modification}::${r.year}::${r.city || "—"}`
 						}
-						pagination={{ pageSize: 10, showSizeChanger: true }}
-						scroll={{ x: 900 }}
+						pagination={{
+							current: page,
+							pageSize,
+							total: filteredModelRows.length,
+							showSizeChanger: true,
+							pageSizeOptions: [10, 20, 50, 100],
+							showTotal: (t) => `Записей: ${t}`,
+							onChange: (p) => setPage(p),
+							onShowSizeChange: (_cur, size) => {
+								setPageSize(size)
+								setPage(1)
+							},
+						}}
+						scroll={{ x: "max-content" }}
+						tableLayout="auto"
+						style={{ width: "100%" }}
 					/>
 				</div>
 			</div>
@@ -214,6 +310,16 @@ export function AutoRuReport() {
 			label: opts.find((c) => c.id === id)?.name || id,
 		}))
 	}, [cityIds, settings.extraCities])
+
+	const getCityLabel = useMemo(() => {
+		const opts = mergeCityOptions(settings.extraCities ?? [])
+		const byId = new Map(opts.map((c) => [String(c.id), c.name]))
+		return (id) => {
+			if (id == null || id === "" || id === "—") return "—"
+			const s = String(id)
+			return byId.get(s) ?? s
+		}
+	}, [settings.extraCities])
 
 	const [cityOverride, setCityOverride] = useState(null)
 	const [brandTab, setBrandTab] = useState(null)
@@ -234,7 +340,7 @@ export function AutoRuReport() {
 		[report, effectiveScopeCity],
 	)
 
-	const { summary, perBrand, perBrandAnalytics } = analytics
+	const { perBrand, perBrandAnalytics } = analytics
 	const brandKeys = Object.keys(perBrand).sort()
 
 	useEffect(() => {
@@ -248,7 +354,11 @@ export function AutoRuReport() {
 	}, [brandKeys])
 
 	return (
-		<div style={{ minHeight: "100%" }}>
+		<Space
+			direction="vertical"
+			style={{ width: "100%" }}
+			size={14}
+		>
 			<Text
 				type="secondary"
 				style={{ display: "block", marginBottom: 10, fontSize: 12 }}
@@ -278,140 +388,38 @@ export function AutoRuReport() {
 				</Text>
 			) : null}
 
-			<div
-				className="ms-stat-grid"
-				style={{ marginBottom: 14 }}
-			>
-				<div className="ms-stat-tile">
-					<Text
-						type="secondary"
-						style={{ fontSize: 11, textTransform: "uppercase" }}
-					>
-						Всего предложений
-					</Text>
-					<div className="ms-stat-tile-val ms-val-blue">
-						{summary.totalOffers.toLocaleString("ru-RU")}
-					</div>
-				</div>
-				<div className="ms-stat-tile">
-					<Text
-						type="secondary"
-						style={{ fontSize: 11, textTransform: "uppercase" }}
-					>
-						Средняя цена
-					</Text>
-					<div className="ms-stat-tile-val ms-val-amber">
-						{money(Math.round(summary.avgPrice))}
-					</div>
-				</div>
-				<div className="ms-stat-tile">
-					<Text
-						type="secondary"
-						style={{ fontSize: 11, textTransform: "uppercase" }}
-					>
-						Мин. цена
-					</Text>
-					<div className="ms-stat-tile-val ms-val-green">
-						{money(summary.minPrice)}
-					</div>
-				</div>
-				<div className="ms-stat-tile">
-					<Text
-						type="secondary"
-						style={{ fontSize: 11, textTransform: "uppercase" }}
-					>
-						Макс. скидка
-					</Text>
-					<div className="ms-stat-tile-val ms-val-red">
-						{money(summary.maxDiscount)}
-					</div>
-				</div>
-			</div>
-
 			{brandKeys.length > 0 && brandTab ? (
 				<>
-					<div
-						className="ms-tabs-bar"
-						style={{ marginBottom: 12 }}
-					>
-						{brandKeys.map((b) => (
-							<button
-								key={b}
-								type="button"
-								className={`ms-tab-btn ${brandTab === b ? "active" : ""}`}
-								onClick={() => setBrandTab(b)}
-							>
-								{b}
-							</button>
-						))}
+					<div className="ms-report-brand-tabs">
+						<Text
+							type="secondary"
+							style={{ display: "block", marginBottom: 8, fontSize: 12 }}
+						>
+							Бренд отчёта
+						</Text>
+						<div className="ms-tabs-bar ms-tabs-bar--prominent">
+							{brandKeys.map((b) => (
+								<button
+									key={b}
+									type="button"
+									className={`ms-tab-btn ${brandTab === b ? "active" : ""}`}
+									onClick={() => setBrandTab(b)}
+								>
+									{b}
+								</button>
+							))}
+						</div>
 					</div>
 					<BrandCockpitPanel
 						brand={brandTab}
 						data={perBrandAnalytics[brandTab]}
 						modelRows={perBrand[brandTab]?.models ?? []}
+						getCityLabel={getCityLabel}
 					/>
 				</>
 			) : (
 				<Text type="secondary">Нет данных — загрузите отчёт на главной.</Text>
 			)}
-
-			<div
-				style={{ marginTop: 16 }}
-				className="ms-dash-card ant-card ant-card-bordered"
-			>
-				<div
-					className="ms-card-hd"
-					style={{ padding: "12px 14px 0" }}
-				>
-					Справочник по моделям
-				</div>
-				<div style={{ padding: "8px 14px 14px" }}>
-					{brandKeys.length === 0 ? (
-						<Text type="secondary">Нет данных</Text>
-					) : (
-						brandKeys.map((brand) => (
-							<div
-								key={brand}
-								style={{ marginBottom: 16 }}
-							>
-								<Space
-									wrap
-									style={{ marginBottom: 8 }}
-								>
-									<Text strong>{brand}</Text>
-									<Tag>{perBrand[brand].models.length} моделей</Tag>
-									<Tag color="success">
-										{perBrand[brand].models.reduce(
-											(s, m) => s + m.totalOffers,
-											0,
-										)}{" "}
-										предложений
-									</Tag>
-								</Space>
-								<Table
-									className="ms-table-polished"
-									size="small"
-									columns={[
-										{
-											title: "",
-											key: "fav",
-											width: 40,
-											render: (_, rec) => <FavoriteStar row={rec} />,
-										},
-										...detailedColumns,
-									]}
-									dataSource={perBrand[brand].models}
-									rowKey={(r) =>
-										`${r.brand}::${r.model}::${r.equipment}::${r.modification}::${r.year}::${r.city || "—"}`
-									}
-									pagination={{ pageSize: 8, showSizeChanger: true }}
-									scroll={{ x: 800 }}
-								/>
-							</div>
-						))
-					)}
-				</div>
-			</div>
-		</div>
+		</Space>
 	)
 }

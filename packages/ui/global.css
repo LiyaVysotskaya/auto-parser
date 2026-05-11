@@ -62,6 +62,16 @@ body,
 	box-shadow: var(--ant-box-shadow-tertiary, none);
 }
 
+.ms-stat-tile--hoverable {
+	cursor: help;
+	transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.ms-stat-tile--hoverable:hover {
+	border-color: var(--ant-color-primary-border-hover);
+	box-shadow: var(--ant-box-shadow-secondary, 0 2px 8px rgba(0, 0, 0, 0.06));
+}
+
 .ms-stat-tile .ant-statistic-title {
 	font-size: 11px;
 	font-weight: 600;
@@ -129,7 +139,6 @@ body,
 .ms-main-content {
 	padding: 20px 22px 28px;
 	max-width: 1600px;
-	margin: 0 auto;
 }
 
 .ms-mono-nums {
@@ -642,22 +651,65 @@ body,
 }
 
 .ms-mini-pos.p2 {
-	background: rgba(255, 255, 255, 0.08);
-	color: var(--ant-color-text-secondary);
+	background: rgba(55, 138, 221, 0.14);
+	color: var(--ms-acc);
+	border: 1px solid rgba(55, 138, 221, 0.35);
 }
 
 .ms-mini-pos.p3 {
-	background: rgba(255, 255, 255, 0.05);
-	color: var(--ant-color-text-tertiary);
+	background: rgba(93, 202, 165, 0.12);
+	color: #0f6e56;
+	border: 1px solid rgba(15, 110, 86, 0.28);
+}
+
+.ms-report-brand-tabs {
+	width: 100%;
+	margin-bottom: 4px;
 }
 
 .ms-tabs-bar {
 	display: inline-flex;
+	flex-wrap: wrap;
 	gap: 2px;
 	background: rgba(255, 255, 255, 0.05);
 	border-radius: 8px;
 	padding: 3px;
 	margin-bottom: 12px;
+}
+
+.ms-tabs-bar--prominent {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 6px;
+	gap: 6px;
+	border: 1px solid var(--ant-color-border-secondary);
+	border-radius: var(--ant-border-radius-lg, 12px);
+	background: var(--ant-color-bg-elevated);
+	box-shadow: var(--ant-box-shadow-tertiary, none);
+}
+
+.ms-tabs-bar--prominent .ms-tab-btn {
+	padding: 8px 16px;
+	border-radius: 8px;
+	font-size: 13px;
+	font-weight: 600;
+	border: 1px solid transparent;
+	background: var(--ant-color-bg-container);
+	color: var(--ant-color-text);
+	box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
+}
+
+.ms-tabs-bar--prominent .ms-tab-btn.active {
+	border-color: rgba(55, 138, 221, 0.45);
+	background: rgba(55, 138, 221, 0.12);
+	color: var(--ms-acc);
+	box-shadow: none;
+}
+
+.ms-tabs-bar--prominent .ms-tab-btn:hover:not(.active) {
+	border-color: var(--ant-color-border);
+	color: var(--ant-color-text);
+	background: var(--ant-color-fill-secondary);
 }
 
 .ms-tab-btn {

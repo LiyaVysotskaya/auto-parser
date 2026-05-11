@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react"
+import { useSelector } from "react-redux"
+import { mergeCityOptions } from "@market-slice/application/settings/defaults.js"
 
 import {
 	Button,
@@ -42,6 +44,7 @@ function uniqueSorted(rowsFlat, key) {
 }
 
 export function DealerComparison({ report = [], forcedCity = null }) {
+	const settings = useSelector((state) => state.settings)
 	const { rowsFlat: rawFlat } = useMemo(() => flattenReport(report), [report])
 	const rowsFlat = useMemo(
 		() => filterRowsFlatByCity(rawFlat, forcedCity),
@@ -50,6 +53,15 @@ export function DealerComparison({ report = [], forcedCity = null }) {
 	const dealers = useMemo(() => uniqueDealers(rowsFlat), [rowsFlat])
 	const allBrands = useMemo(() => uniqueSorted(rowsFlat, "brand"), [rowsFlat])
 	const allCities = useMemo(() => uniqueSorted(rowsFlat, "city"), [rowsFlat])
+	const getCityLabel = useMemo(() => {
+		const opts = mergeCityOptions(settings.extraCities ?? [])
+		const byId = new Map(opts.map((c) => [String(c.id), c.name]))
+		return (id) => {
+			if (id == null || id === "" || id === "—") return "—"
+			const s = String(id)
+			return byId.get(s) ?? s
+		}
+	}, [settings.extraCities])
 
 	const [baseDealer, setBaseDealer] = useState(null)
 	const [otherDealers, setOtherDealers] = useState([])
@@ -195,7 +207,7 @@ export function DealerComparison({ report = [], forcedCity = null }) {
 						<b>{r.model}</b>
 						<Text type="secondary" style={{ fontSize: 12 }}>
 							{r.equipment} • {r.modification} • {r.year}
-							{r.city && r.city !== "—" ? ` • ${r.city}` : ""}
+							{r.city && r.city !== "—" ? ` • ${getCityLabel(r.city)}` : ""}
 						</Text>
 					</div>
 				),
@@ -276,7 +288,7 @@ export function DealerComparison({ report = [], forcedCity = null }) {
 					{forcedCity ? (
 						<>
 							{" "}
-							<Tag color="blue">Город: {forcedCity}</Tag>
+							<Tag color="blue">Город: {getCityLabel(forcedCity)}</Tag>
 						</>
 					) : null}
 				</Paragraph>
@@ -379,7 +391,10 @@ export function DealerComparison({ report = [], forcedCity = null }) {
 								allowClear
 								placeholder="Все"
 								style={{ width: "100%" }}
-								options={allCities.map((c) => ({ value: c, label: c }))}
+								options={allCities.map((c) => ({
+									value: c,
+									label: getCityLabel(c),
+								}))}
 								value={filterCities}
 								onChange={setFilterCities}
 							/>

@@ -105,6 +105,15 @@ export function AutoRu() {
 			slug: settings.city ?? "—",
 		}
 	}, [settings.city, settings.extraCities])
+	const getCityLabel = useMemo(() => {
+		const opts = mergeCityOptions(settings.extraCities ?? [])
+		const byId = new Map(opts.map((c) => [String(c.id), c.name]))
+		return (id) => {
+			if (id == null || id === "" || id === "—") return "—"
+			const s = String(id)
+			return byId.get(s) ?? s
+		}
+	}, [settings.extraCities])
 
 	const report = autoRuState.report || []
 
@@ -287,7 +296,7 @@ export function AutoRu() {
 		const dealer = p.dealer && String(p.dealer).trim()
 		const city =
 			p.city != null && String(p.city).trim() && String(p.city).trim() !== "—"
-				? String(p.city).trim()
+				? getCityLabel(String(p.city).trim())
 				: ""
 		if (!car && !dealer && !city) return null
 		const parts = []
@@ -295,7 +304,7 @@ export function AutoRu() {
 		if (dealer) parts.push(dealer)
 		if (city) parts.push(city)
 		return `Последняя точка (${p.label}): ${parts.join(" · ")}`
-	}, [lineSeries])
+	}, [getCityLabel, lineSeries])
 
 	return (
 		<Space
@@ -572,6 +581,7 @@ export function AutoRu() {
 					<CockpitMinPriceLine
 						data={lineSeries}
 						height={140}
+						getCityLabel={getCityLabel}
 					/>
 					{lineLastContext ? (
 						<div
@@ -635,7 +645,7 @@ export function AutoRu() {
 					priceMoves.map((r, i) => {
 						const title =
 							`${r.brand || ""} ${r.model || ""} · ${r.equipment || "—"}`.trim()
-						const sub = `${r.dealer || "—"} · ${r.city || "—"}`
+						const sub = `${r.dealer || "—"} · ${getCityLabel(r.city)}`
 						const up = r._delta > 0
 						return (
 							<div
@@ -690,7 +700,7 @@ export function AutoRu() {
 												{best.city &&
 												String(best.city).trim() &&
 												String(best.city).trim() !== "—"
-													? ` · ${best.city}`
+													? ` · ${getCityLabel(best.city)}`
 													: ""}
 											</div>
 											<div className="ms-fav-price">{money(best.price)}</div>

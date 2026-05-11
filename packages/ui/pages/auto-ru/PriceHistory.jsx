@@ -5,6 +5,7 @@ import {
 	DownloadOutlined,
 	UploadOutlined,
 } from "@ant-design/icons"
+import { mergeCityOptions } from "@market-slice/application/settings/defaults.js"
 import {
 	Bar,
 	BarChart,
@@ -233,6 +234,15 @@ export function PriceHistory({ initialTab = "table" } = {}) {
 	const [chartMetric, setChartMetric] = useState("price")
 
 	const settings = useSelector((state) => state.settings)
+	const getCityLabel = useMemo(() => {
+		const opts = mergeCityOptions(settings.extraCities ?? [])
+		const byId = new Map(opts.map((c) => [String(c.id), c.name]))
+		return (id) => {
+			if (id == null || id === "" || id === "—") return "—"
+			const s = String(id)
+			return byId.get(s) ?? s
+		}
+	}, [settings.extraCities])
 	const didAutoCity = useRef(false)
 	const { token } = theme.useToken()
 	const { isDark } = useTheme()
@@ -514,6 +524,7 @@ export function PriceHistory({ initialTab = "table" } = {}) {
 				key: "city",
 				width: 100,
 				sorter: (a, b) => String(a.city || "").localeCompare(String(b.city || ""), "ru"),
+				render: (v) => getCityLabel(v),
 			},
 			{
 				title: "Дилер",
@@ -565,7 +576,7 @@ export function PriceHistory({ initialTab = "table" } = {}) {
 				},
 			},
 		],
-		[token.colorError, token.colorSuccess, token.colorTextSecondary],
+		[getCityLabel, token.colorError, token.colorSuccess, token.colorTextSecondary],
 	)
 
 	const groupParentColumns = useMemo(
@@ -606,7 +617,7 @@ export function PriceHistory({ initialTab = "table" } = {}) {
 
 	const runOptions = (runs || []).map((r) => ({
 		value: r.id,
-		label: `${String(r.started).slice(0, 19)} — ${r.city} (${r.offer_count ?? 0})`,
+		label: `${String(r.started).slice(0, 19)} — ${getCityLabel(r.city)} (${r.offer_count ?? 0})`,
 	}))
 
 	const runDiff = async () => {
@@ -783,6 +794,7 @@ export function PriceHistory({ initialTab = "table" } = {}) {
 				dataIndex: "city",
 				key: "city",
 				width: 90,
+				render: (v) => getCityLabel(v),
 			},
 			{
 				title: "Дилер",
@@ -816,7 +828,7 @@ export function PriceHistory({ initialTab = "table" } = {}) {
 				render: (v) => (v == null ? "—" : pct(v)),
 			},
 		],
-		[],
+		[getCityLabel],
 	)
 
 	const diffGroupColumns = useMemo(
@@ -1040,7 +1052,10 @@ export function PriceHistory({ initialTab = "table" } = {}) {
 							allowClear
 							placeholder="Все"
 							style={{ width: "100%" }}
-							options={(meta.cities || []).map((c) => ({ value: c, label: c }))}
+							options={(meta.cities || []).map((c) => ({
+								value: c,
+								label: getCityLabel(c),
+							}))}
 							value={cities}
 							onChange={setCities}
 						/>

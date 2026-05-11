@@ -18,11 +18,11 @@ import { theme } from "antd"
 
 import { REF } from "../../theme-tokens.js"
 
-function minPriceTooltip({ active, payload, label }, token) {
+function minPriceTooltip({ active, payload, label }, token, getCityLabel) {
 	if (!active || !payload?.length) return null
 	const p = payload[0]?.payload || {}
 	const title = [p.brand, p.model].filter(Boolean).join(" ").trim()
-	const loc = [p.dealer, p.city && p.city !== "—" ? p.city : null]
+	const loc = [p.dealer, p.city && p.city !== "—" ? getCityLabel(p.city) : null]
 		.filter(Boolean)
 		.join(" · ")
 	return (
@@ -57,7 +57,7 @@ function minPriceTooltip({ active, payload, label }, token) {
 }
 
 /** Минимальная цена по запускам, тыс. ₽ (ось Y как в HTML-прототипе). */
-export function CockpitMinPriceLine({ data, height = 140 }) {
+export function CockpitMinPriceLine({ data, height = 140, getCityLabel = (x) => x }) {
 	const { token } = theme.useToken()
 	const stroke = REF.acc
 	const fill = "rgba(55,138,221,0.12)"
@@ -97,7 +97,7 @@ export function CockpitMinPriceLine({ data, height = 140 }) {
 						tickFormatter={(v) => `${v}`}
 						width={36}
 					/>
-					<Tooltip content={(props) => minPriceTooltip(props, token)} />
+					<Tooltip content={(props) => minPriceTooltip(props, token, getCityLabel)} />
 					<Area type="monotone" dataKey="value" stroke="none" fill={fill} fillOpacity={1} />
 					<Line
 						type="monotone"

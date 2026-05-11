@@ -53,30 +53,30 @@ export function Competitors() {
 		return filterRowsFlatByCity(rowsFlat, effectiveScopeCity)
 	}, [report, effectiveScopeCity])
 
-	const { topDealers } = analytics
-
-	const topFive = useMemo(
-		() => [...(topDealers || [])].slice(0, 5),
-		[topDealers],
-	)
-	const maxUnits = useMemo(
-		() => Math.max(1, ...topFive.map((d) => d.units ?? d.count ?? 0)),
-		[topFive],
-	)
-
-	const modelBarRows = useMemo(() => {
-		const m = new Map()
-		for (const r of rowsFlatScoped) {
-			const name = r.model || "—"
-			m.set(name, (m.get(name) || 0) + (r.count || 0))
+	const brandCards = useMemo(() => {
+		const items = []
+		for (const tab of report || []) {
+			const brand = tab?.name || "Unknown"
+			const topDealers = analytics.perBrandAnalytics?.[brand]?.topDealers || []
+			const topFive = [...topDealers].slice(0, 5)
+			const maxUnits = Math.max(1, ...topFive.map((d) => d.units ?? d.count ?? 0))
+			const brandRows = rowsFlatScoped.filter((r) => r.brand === brand)
+			const modelMap = new Map()
+			for (const r of brandRows) {
+				const name = r.model || "—"
+				modelMap.set(name, (modelMap.get(name) || 0) + (r.count || 0))
+			}
+			const modelBarRows = [...modelMap.entries()]
+				.sort((a, b) => b[1] - a[1])
+				.slice(0, 8)
+				.map(([name, value]) => ({
+					name: name.length > 14 ? `${name.slice(0, 12)}…` : name,
+					value,
+				}))
+			items.push({ brand, topFive, maxUnits, modelBarRows, brandRows })
 		}
-		return [...m.entries()]
-			.sort((a, b) => b[1] - a[1])
-			.slice(0, 8)
-			.map(([name, value]) => ({ name: name.length > 14 ? `${name.slice(0, 12)}…` : name, value }))
-	}, [rowsFlatScoped])
-
-	const firstBrand = report[0]?.name
+		return items
+	}, [analytics.perBrandAnalytics, report, rowsFlatScoped])
 
 	if (!report.length) {
 		return (
@@ -110,40 +110,42 @@ export function Competitors() {
 				Объём предложений по дилерам — нажмите на строку в таблице сравнения ниже, чтобы задать базу в блоке «Сравнение».
 			</Text>
 
-			<div className="ms-cockpit-g2">
-				<Card className="ms-dash-card" size="small" title={`Топ дилеров${firstBrand ? ` — ${firstBrand}` : ""}`}>
-					{topFive.map((d, idx) => {
-						const full = d.dealer || "—"
-						const n = d.units ?? d.count ?? 0
-						const pct = Math.round((n / maxUnits) * 100)
-						const models = dealerModelBreakdown(rowsFlatScoped, full, 4).map((x) => x.model)
-						return (
-							<div key={full} className="ms-comp-row">
-								<div style={{ fontSize: 10, color: "var(--ant-color-text-quaternary)", width: 14 }}>
-									{idx + 1}
-								</div>
-								<div style={{ flex: 1, minWidth: 0 }}>
-									<div className="ms-comp-name">{full}</div>
-									<div style={{ marginTop: 2 }}>
-										{models.map((m) => (
-											<span key={m} className="ms-chip ms-chip-blue" style={{ marginRight: 4 }}>
-												{m}
-											</span>
-										))}
+			{brandCards.map(({ brand, topFive, maxUnits, modelBarRows, brandRows }) => (
+				<div key={brand} className="ms-cockpit-g2">
+					<Card className="ms-dash-card" size="small" title={`Топ дилеров — ${brand}`}>
+						{topFive.map((d, idx) => {
+							const full = d.dealer || "—"
+							const n = d.units ?? d.count ?? 0
+							const pct = Math.round((n / maxUnits) * 100)
+							const models = dealerModelBreakdown(brandRows, full, 4).map((x) => x.model)
+							return (
+								<div key={full} className="ms-comp-row">
+									<div style={{ fontSize: 10, color: "var(--ant-color-text-quaternary)", width: 14 }}>
+										{idx + 1}
 									</div>
+									<div style={{ flex: 1, minWidth: 0 }}>
+										<div className="ms-comp-name">{full}</div>
+										<div style={{ marginTop: 2 }}>
+											{models.map((m) => (
+												<span key={m} className="ms-chip ms-chip-blue" style={{ marginRight: 4 }}>
+													{m}
+												</span>
+											))}
+										</div>
+									</div>
+									<div className="ms-bar-bg">
+										<div className="ms-bar-fill" style={{ width: `${pct}%` }} />
+									</div>
+									<div className="ms-comp-cnt">{n}</div>
 								</div>
-								<div className="ms-bar-bg">
-									<div className="ms-bar-fill" style={{ width: `${pct}%` }} />
-								</div>
-								<div className="ms-comp-cnt">{n}</div>
-							</div>
-						)
-					})}
-				</Card>
-				<Card className="ms-dash-card" size="small" title="Распределение по моделям">
-					<CockpitModelHBar rows={modelBarRows} height={200} />
-				</Card>
-			</div>
+							)
+						})}
+					</Card>
+					<Card className="ms-dash-card" size="small" title={`Распределение по моделям — ${brand}`}>
+						<CockpitModelHBar rows={modelBarRows} height={200} />
+					</Card>
+				</div>
+			))}
 
 			<DealerComparison report={report} forcedCity={effectiveScopeCity} />
 		</Space>

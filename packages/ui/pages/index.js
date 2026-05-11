@@ -2,7 +2,6 @@ import React from "react"
 
 import {
 	DashboardOutlined,
-	DiffOutlined,
 	LineChartOutlined,
 	SettingOutlined,
 	ShopOutlined,
@@ -14,7 +13,6 @@ import _ from "lodash"
 import { Layout } from "../layout.js"
 import { Competitors } from "./auto-ru/Competitors.jsx"
 import { PriceHistory } from "./auto-ru/PriceHistory.jsx"
-import { ReportCompare } from "./auto-ru/ReportCompare.jsx"
 import { AutoRu } from "./auto-ru/index.js"
 import { AutoRuReport } from "./auto-ru/report.js"
 import { Settings } from "./settings/index.js"
@@ -85,12 +83,6 @@ export const pages = [
 						element: <PriceHistory />,
 						icon: <LineChartOutlined />,
 						label: "История цен",
-					},
-					{
-						path: "compare",
-						element: <ReportCompare />,
-						icon: <DiffOutlined />,
-						label: "Сравнение",
 					},
 					{
 						path: "settings",

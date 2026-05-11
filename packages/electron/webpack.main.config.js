@@ -20,6 +20,9 @@ module.exports = {
 		"puppeteer-core": "puppeteer-core",
 		"puppeteer-extra": "puppeteer-extra",
 		"puppeteer-extra-plugin-stealth": "puppeteer-extra-plugin-stealth",
-		"better-sqlite3": "commonjs better-sqlite3",
+		"better-sqlite3": "better-sqlite3",
+	},
+	optimization: {
+		minimize: false,
 	},
 }

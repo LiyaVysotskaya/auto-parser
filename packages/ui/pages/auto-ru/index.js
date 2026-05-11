@@ -11,7 +11,7 @@ import {
 } from "@ant-design/icons"
 import { mergeCityOptions } from "@market-slice/application/settings/defaults.js"
 import * as appStore from "@market-slice/application/store"
-import * as autoRuTools from "@market-slice/auto-ru"
+import { parseXlsx, reportName, xlsx } from "@market-slice/auto-ru/xlsx.js"
 import {
 	Alert,
 	Button,
@@ -199,8 +199,8 @@ export function AutoRu() {
 							icon={<DownloadOutlined />}
 							onClick={() => {
 								XLSX.writeFile(
-									autoRuTools.xlsx(autoRuState.report || []),
-									autoRuTools.reportName(autoRuState.report || [], "xlsx"),
+									xlsx(autoRuState.report || []),
+									reportName(autoRuState.report || [], "xlsx"),
 								)
 							}}
 							disabled={!autoRuState.report || !autoRuState.report.length}
@@ -217,7 +217,7 @@ export function AutoRu() {
 								if (!file) return
 								try {
 									const buf = await file.arrayBuffer()
-									const parsed = autoRuTools.parseXlsx(buf)
+									const parsed = parseXlsx(buf)
 									if (!parsed.length) {
 										message.error(
 											"Не удалось прочитать файл: нет листов с ожидаемыми заголовками столбцов",

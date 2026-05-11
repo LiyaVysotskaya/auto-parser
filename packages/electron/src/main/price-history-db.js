@@ -4,9 +4,33 @@ const { flattenReport } = require("@market-slice/application")
 
 let dbInstance = null
 
+function requireSqlite() {
+	try {
+		return require("better-sqlite3")
+	} catch {
+		// In packaged app, better-sqlite3 is in extraResource
+		const fromResource = path.join(
+			process.resourcesPath,
+			"node_modules",
+			"better-sqlite3",
+		)
+		// Use __non_webpack_require__ to bypass webpack bundling
+		return typeof __non_webpack_require__ !== "undefined"
+			? __non_webpack_require__(fromResource)
+			: require(fromResource)
+	}
+}
+
 function getDb(app) {
 	if (dbInstance) return dbInstance
-	const Database = require("better-sqlite3")
+	const Database = requireSqlite()
+	if (typeof Database !== "function") {
+		const keys = Database ? Object.keys(Database).join(", ") : "null"
+		throw new Error(
+			`better-sqlite3 вернул ${typeof Database} вместо конструктора. ` +
+				`Keys: [${keys}]. Возможно, модуль не был корректно собран electron-rebuild.`,
+		)
+	}
 	const dbPath = path.join(app.getPath("userData"), "price-history.db")
 	const db = new Database(dbPath)
 	db.pragma("journal_mode = WAL")

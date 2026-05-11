@@ -4,7 +4,15 @@ import {
 	DownloadOutlined,
 	UploadOutlined,
 } from "@ant-design/icons"
-import { Line } from "@ant-design/plots"
+import {
+	CartesianGrid,
+	Line,
+	LineChart,
+	ResponsiveContainer,
+	Tooltip,
+	XAxis,
+	YAxis,
+} from "recharts"
 import {
 	Button,
 	Card,
@@ -20,7 +28,7 @@ import {
 	theme,
 } from "antd"
 import dayjs from "dayjs"
-import * as autoRuTools from "@market-slice/auto-ru"
+import { parseXlsx } from "@market-slice/auto-ru/xlsx.js"
 
 import { diffFlattenedOffers, flattenReport } from "../../analytics.js"
 import { electron } from "../../electron.js"
@@ -250,7 +258,7 @@ export function PriceHistory() {
 
 	const parseXlsxFile = async (file) => {
 		const buf = await file.arrayBuffer()
-		const report = autoRuTools.parseXlsx(buf)
+		const report = parseXlsx(buf)
 		if (!report?.length) {
 			message.error("Не удалось разобрать XLSX (ожидаемые заголовки колонок)")
 			return null
@@ -485,18 +493,30 @@ export function PriceHistory() {
 						key: "chart",
 						label: "График",
 						children: chartData.length ? (
-							<Line
-								data={chartData}
-								xField="date"
-								yField="price"
-								height={320}
-								color={token.colorPrimary}
-								point={{ size: 4 }}
-								meta={{
-									price: { alias: "Мин. цена, ₽" },
-									date: { alias: "Дата запуска" },
-								}}
-							/>
+							<ResponsiveContainer width="100%" height={320}>
+								<LineChart data={chartData}>
+									<CartesianGrid strokeDasharray="3 3" />
+									<XAxis dataKey="date" tick={{ fontSize: 12 }} />
+									<YAxis
+										tick={{ fontSize: 12 }}
+										tickFormatter={(v) =>
+											v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v
+										}
+									/>
+									<Tooltip
+										formatter={(v) => [`${Number(v).toLocaleString("ru-RU")} ₽`, "Мин. цена"]}
+										labelFormatter={(l) => `Дата: ${l}`}
+									/>
+									<Line
+										type="monotone"
+										dataKey="price"
+										stroke={token.colorPrimary}
+										strokeWidth={2}
+										dot={{ r: 3 }}
+										activeDot={{ r: 5 }}
+									/>
+								</LineChart>
+							</ResponsiveContainer>
 						) : (
 							<Text type="secondary">Нет данных для графика</Text>
 						),

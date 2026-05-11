@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	priceHistoryImport: (data) =>
 		ipcRenderer.invoke("price-history-import", data),
 	priceHistoryClear: () => ipcRenderer.invoke("price-history-clear"),
+	priceHistorySeedMock: () => ipcRenderer.invoke("price-history-seed-mock"),
 	priceHistoryDiff: (payload) =>
 		ipcRenderer.invoke("price-history-diff", payload),
 	favoritesList: () => ipcRenderer.invoke("favorites-list"),

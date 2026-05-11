@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux"
 
 import {
 	CalendarOutlined,
+	DatabaseOutlined,
 	DeleteOutlined,
 	DownloadOutlined,
 	EnvironmentOutlined,
@@ -200,6 +201,29 @@ export function Settings() {
 				>
 					Сбросить
 				</Button>
+				{electron?.priceHistorySeedMock ? (
+					<Button
+						icon={<DatabaseOutlined />}
+						onClick={async () => {
+							const res = await electron.priceHistorySeedMock()
+							if (!res?.ok) {
+								message.error(res?.error || "Ошибка заполнения")
+								return
+							}
+							if (res.skipped) {
+								message.info(
+									"В базе уже есть запуски — демо-данные не добавлены. Очистите историю и повторите.",
+								)
+							} else {
+								message.success(
+									`Демо-данные: запусков ${res.runs ?? 0}, строк ${res.offers ?? 0}`,
+								)
+							}
+						}}
+					>
+						Заполнить тестовыми данными
+					</Button>
+				) : null}
 				{electron?.priceHistoryClear ? (
 					<Button
 						danger

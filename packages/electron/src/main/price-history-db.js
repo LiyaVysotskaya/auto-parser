@@ -501,6 +501,193 @@ function removeFavorite(app, row) {
 	})
 }
 
+/** Детерминированный PRNG для воспроизводимых mock-данных */
+function mulberry32(seed) {
+	let t = seed >>> 0
+	return function rand() {
+		t += 0x6d2b79f5
+		let r = Math.imul(t ^ (t >>> 15), 1 | t)
+		r ^= r + Math.imul(r ^ (r >>> 7), 61 | r)
+		return ((r ^ (r >>> 14)) >>> 0) / 4294967296
+	}
+}
+
+/**
+ * Заполняет пустую БД демо-данными (Уфа / Санкт-Петербург, бренды из плана).
+ * Если в `runs` уже есть строки — ничего не делает.
+ */
+function seedMockData(app) {
+	const db = getDb(app)
+	const { c: runCount } = db.prepare(`SELECT COUNT(*) AS c FROM runs`).get()
+	if (Number(runCount) > 0) {
+		return { ok: true, skipped: true, runs: 0, offers: 0 }
+	}
+
+	const brands = [
+		"EXEED",
+		"Geely",
+		"Haval",
+		"Chery",
+		"Omoda",
+		"Jaecoo",
+		"Seres",
+		"Tenet",
+	]
+	const modelsByBrand = {
+		EXEED: ["VX", "LX", "RX"],
+		Geely: ["Monjaro", "Coolray", "Atlas Pro"],
+		Haval: ["Jolion", "Dargo", "H5"],
+		Chery: ["Tiggo 7 Pro", "Tiggo 8", "Arrizo 8"],
+		Omoda: ["C5", "S5", "C7"],
+		Jaecoo: ["J7", "J8"],
+		Seres: ["5", "7"],
+		Tenet: ["T5", "T7"],
+	}
+	const cities = ["Уфа", "Санкт-Петербург"]
+	const dealers = [
+		"Автомир",
+		"Рольф",
+		"Авилон",
+		"Ключ Авто",
+		"Агат",
+		"АЦ Монолит",
+		"Максимум",
+		"Сатурн",
+	]
+	const equipments = ["Classic", "Comfort", "Luxury", "Premium", "Flagship"]
+	const years = [2024, 2025, 2026]
+	const modifications = ["1.5T AT", "2.0T AT", "1.6 MT", "E-Power"]
+
+	const rand = mulberry32(0x9e3779b9)
+	const baseOffers = []
+	let oid = 0
+	for (const brand of brands) {
+		const models = modelsByBrand[brand] || ["Base"]
+		for (const model of models) {
+			for (const equipment of equipments.slice(0, 3)) {
+				const dealer = dealers[oid % dealers.length]
+				const city = cities[oid % cities.length]
+				const year = years[oid % years.length]
+				const modification = modifications[oid % modifications.length]
+				const basePrice =
+					1_500_000 + Math.floor(rand() * 3_500_000) + (oid % 7) * 25_000
+				baseOffers.push({
+					brand,
+					model,
+					equipment,
+					modification,
+					year,
+					city,
+					dealer,
+					basePrice,
+					oid: oid++,
+				})
+			}
+		}
+	}
+
+	const insertRun = db.prepare(
+		`INSERT INTO runs (started, finished, city, status) VALUES (@started, @finished, @city, @status)`,
+	)
+	const insOffer = db.prepare(`
+		INSERT INTO offers (
+			run_id, brand, model, equipment, modification, year, city, dealer, count,
+			price, price_min, second_price, max_discount,
+			tradein_discount, credit_discount, insurance_discount
+		) VALUES (
+			@run_id, @brand, @model, @equipment, @modification, @year, @city, @dealer, @count,
+			@price, @price_min, @second_price, @max_discount,
+			@tradein_discount, @credit_discount, @insurance_discount
+		)
+	`)
+
+	const runDays = 6
+	const now = Date.now()
+	const dayMs = 86400000
+	let totalOffers = 0
+
+	const tx = db.transaction(() => {
+		for (let ri = 0; ri < runDays; ri++) {
+			const started = new Date(
+				now - (runDays - 1 - ri) * 5 * dayMs - ri * 3600000,
+			)
+				.toISOString()
+				.replace(/\.\d{3}Z$/, "")
+			const finished = new Date(new Date(started).getTime() + 45 * 60000)
+				.toISOString()
+				.replace(/\.\d{3}Z$/, "")
+			const cityLabel = cities[ri % cities.length]
+			const info = insertRun.run({
+				started,
+				finished,
+				city: cityLabel,
+				status: "success",
+			})
+			const runId = Number(info.lastInsertRowid)
+			const priceDrift = 1 + (ri - 2) * 0.025
+
+			for (let i = 0; i < baseOffers.length; i++) {
+				if (ri >= 3 && i % 11 === 7) continue
+				if (ri >= 4 && i % 13 === 3) continue
+				if (ri === 5 && i % 17 === 5) continue
+				const b = baseOffers[i]
+				const jitter = 0.92 + rand() * 0.12
+				const price = Math.round(b.basePrice * priceDrift * jitter)
+				const secondPrice = Math.round(price * (1.02 + rand() * 0.04))
+				const priceMin = Math.round(price * (0.97 + rand() * 0.02))
+				const maxDiscount = Math.round(50_000 + rand() * 350_000)
+				const tradein = Math.round(rand() * 80_000)
+				const credit = Math.round(rand() * 120_000)
+				const insurance = Math.round(rand() * 40_000)
+				insOffer.run({
+					run_id: runId,
+					brand: b.brand,
+					model: b.model,
+					equipment: b.equipment,
+					modification: b.modification,
+					year: b.year,
+					city: b.city,
+					dealer: b.dealer,
+					count: 1 + (i % 3),
+					price,
+					price_min: priceMin,
+					second_price: secondPrice,
+					max_discount: maxDiscount,
+					tradein_discount: tradein,
+					credit_discount: credit,
+					insurance_discount: insurance,
+				})
+				totalOffers++
+			}
+
+			if (ri >= 2) {
+				const extra = {
+					brand: "Omoda",
+					model: "S5",
+					equipment: "GT",
+					modification: "1.6T",
+					year: 2025,
+					city: cities[(ri + 1) % 2],
+					dealer: dealers[ri % dealers.length],
+					count: 1,
+					price: 2_150_000 + ri * 9000,
+					price_min: 2_050_000,
+					second_price: 2_280_000,
+					max_discount: 180_000,
+					tradein_discount: 30_000,
+					credit_discount: 50_000,
+					insurance_discount: 10_000,
+				}
+				insOffer.run({ run_id: runId, ...extra })
+				totalOffers++
+			}
+		}
+	})
+	tx()
+
+	return { ok: true, skipped: false, runs: runDays, offers: totalOffers }
+}
+
 module.exports = {
 	persistRun,
 	listRuns,
@@ -513,4 +700,5 @@ module.exports = {
 	listFavorites,
 	addFavorite,
 	removeFavorite,
+	seedMockData,
 }

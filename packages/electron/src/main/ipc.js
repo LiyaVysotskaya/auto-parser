@@ -241,6 +241,22 @@ function registerIpcHandlers({ app, ipcMain }) {
 		}
 	})
 
+	ipcMain.handle("price-history-seed-mock", async () => {
+		try {
+			const result = priceHistoryDb.seedMockData(app)
+			return result
+		} catch (error) {
+			console.error("price-history-seed-mock:", error)
+			return {
+				ok: false,
+				error: error?.message || String(error),
+				skipped: false,
+				runs: 0,
+				offers: 0,
+			}
+		}
+	})
+
 	ipcMain.handle("price-history-diff", async (_event, { runIdA, runIdB }) => {
 		try {
 			if (!runIdA || !runIdB) {

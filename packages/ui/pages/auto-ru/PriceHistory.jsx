@@ -5,7 +5,10 @@ import {
 	UploadOutlined,
 } from "@ant-design/icons"
 import {
+	Bar,
+	BarChart,
 	CartesianGrid,
+	Legend,
 	Line,
 	LineChart,
 	ResponsiveContainer,
@@ -16,16 +19,21 @@ import {
 import {
 	Button,
 	Card,
+	Checkbox,
+	Col,
 	DatePicker,
+	Input,
+	Row,
 	Select,
+	Segmented,
 	Space,
+	Statistic,
 	Table,
 	Tabs,
 	Tag,
 	Typography,
 	Upload,
 	message,
-	theme,
 } from "antd"
 import dayjs from "dayjs"
 import { parseXlsx } from "@market-slice/auto-ru/xlsx.js"
@@ -36,6 +44,19 @@ import { money, pct } from "./report-formatters.js"
 
 const { Text, Title } = Typography
 const { RangePicker } = DatePicker
+
+const CHART_COLORS = [
+	"#1677ff",
+	"#52c41a",
+	"#fa8c16",
+	"#eb2f96",
+	"#722ed1",
+	"#13c2c2",
+	"#f5222d",
+	"#2f54eb",
+	"#a0d911",
+	"#faad14",
+]
 
 function stableOfferKey(r) {
 	return [
@@ -81,8 +102,137 @@ function attachPriceDeltas(rows) {
 	return rows
 }
 
+function rowSearchHaystack(r) {
+	return [
+		r.brand,
+		r.model,
+		r.equipment,
+		r.modification,
+		String(r.year ?? ""),
+		r.city,
+		r.dealer,
+		String(r.run_started ?? ""),
+	]
+		.join(" ")
+		.toLowerCase()
+}
+
+function newDisappearedBetweenFirstLastRun(rows) {
+	if (!rows.length) return { newKeys: 0, goneKeys: 0 }
+	const byTime = [...new Set(rows.map((r) => String(r.run_started || "")))].filter(
+		Boolean,
+	)
+	byTime.sort((a, b) => a.localeCompare(b))
+	if (byTime.length < 2) return { newKeys: 0, goneKeys: 0 }
+	const first = byTime[0]
+	const last = byTime[byTime.length - 1]
+	const firstKeys = new Set(
+		rows.filter((r) => String(r.run_started) === first).map(stableOfferKey),
+	)
+	const lastKeys = new Set(
+		rows.filter((r) => String(r.run_started) === last).map(stableOfferKey),
+	)
+	let newKeys = 0
+	for (const k of lastKeys) if (!firstKeys.has(k)) newKeys++
+	let goneKeys = 0
+	for (const k of firstKeys) if (!lastKeys.has(k)) goneKeys++
+	return { newKeys, goneKeys }
+}
+
+function uniqueVals(rows, pick) {
+	const s = new Set()
+	for (const r of rows) {
+		const v = pick(r)
+		if (v != null && String(v).trim() !== "" && v !== "—") s.add(String(v))
+	}
+	return [...s].sort((a, b) => a.localeCompare(b, "ru"))
+}
+
+function minPriceOnDate(rows, datePrefix, pred) {
+	let m = Infinity
+	for (const r of rows) {
+		if (r.price == null) continue
+		const d = String(r.run_started || "").slice(0, 10)
+		if (d !== datePrefix) continue
+		if (pred && !pred(r)) continue
+		if (r.price < m) m = r.price
+	}
+	return m === Infinity ? null : m
+}
+
+function countOnDate(rows, datePrefix, pred) {
+	let n = 0
+	for (const r of rows) {
+		const d = String(r.run_started || "").slice(0, 10)
+		if (d !== datePrefix) continue
+		if (pred && !pred(r)) continue
+		n++
+	}
+	return n
+}
+
+function buildChartPack(rows, lineMode, metric, topN) {
+	const dates = [
+		...new Set(rows.map((r) => String(r.run_started || "").slice(0, 10))),
+	]
+		.filter(Boolean)
+		.sort((a, b) => a.localeCompare(b))
+	if (!dates.length) return { data: [], series: [], metric }
+
+	if (lineMode === "overall") {
+		const data = dates.map((date) => {
+			if (metric === "count") {
+				return { date, v0: countOnDate(rows, date, null) }
+			}
+			return { date, v0: minPriceOnDate(rows, date, null) }
+		})
+		return {
+			data,
+			series: [{ key: "v0", label: metric === "count" ? "Предложений" : "Мин. цена" }],
+			metric,
+		}
+	}
+
+	const scoreMap = new Map()
+	for (const r of rows) {
+		if (metric === "price" && r.price == null) continue
+		const label =
+			lineMode === "dealer"
+				? String(r.dealer || "—")
+				: `${r.brand || "—"} ${r.model || "—"}`.trim()
+		scoreMap.set(label, (scoreMap.get(label) || 0) + 1)
+	}
+	const topLabels = [...scoreMap.entries()]
+		.sort((a, b) => b[1] - a[1])
+		.slice(0, topN)
+		.map(([k]) => k)
+
+	const series = topLabels.map((label, i) => ({
+		key: `v${i}`,
+		label,
+		color: CHART_COLORS[i % CHART_COLORS.length],
+		pred:
+			lineMode === "dealer"
+				? (r) => String(r.dealer || "—") === label
+				: (r) => `${r.brand || "—"} ${r.model || "—"}`.trim() === label,
+	}))
+
+	const data = dates.map((date) => {
+		const row = { date }
+		for (const s of series) {
+			if (metric === "count") {
+				row[s.key] = countOnDate(rows, date, s.pred)
+			} else {
+				row[s.key] = minPriceOnDate(rows, date, s.pred)
+			}
+		}
+		return row
+	})
+
+	return { data, series, metric }
+}
+
 export function PriceHistory() {
-	const { token } = theme.useToken()
 	const [tab, setTab] = useState("table")
 	const [range, setRange] = useState(() => [
 		dayjs().subtract(30, "day").startOf("day"),
@@ -108,6 +258,21 @@ export function PriceHistory() {
 	const xlsxARef = useRef(null)
 	const xlsxBRef = useRef(null)
 	const [xlsxPick, setXlsxPick] = useState({ a: null, b: null })
+
+	const [tableView, setTableView] = useState("flat")
+	const [tableSearch, setTableSearch] = useState("")
+	const [deltaFilter, setDeltaFilter] = useState("all")
+	const [onlyChanged, setOnlyChanged] = useState(false)
+
+	const [chartLineMode, setChartLineMode] = useState("overall")
+	const [chartMetric, setChartMetric] = useState("price")
+
+	const [diffBrands, setDiffBrands] = useState([])
+	const [diffModels, setDiffModels] = useState([])
+	const [diffDealers, setDiffDealers] = useState([])
+	const [diffSearch, setDiffSearch] = useState("")
+	const [diffChangeFilter, setDiffChangeFilter] = useState("all")
+	const [diffGroupView, setDiffGroupView] = useState("flat")
 
 	const dateFrom =
 		range?.[0] &&
@@ -169,68 +334,261 @@ export function PriceHistory() {
 		loadRows()
 	}, [loadRows])
 
-	const chartData = useMemo(() => {
-		const byDate = new Map()
-		for (const r of rows) {
-			if (r.price == null) continue
-			const d = String(r.run_started || "").slice(0, 10)
-			if (!d) continue
-			const cur = byDate.get(d)
-			if (!cur || r.price < cur.price) {
-				byDate.set(d, { date: d, price: r.price })
-			}
-		}
-		return [...byDate.entries()]
-			.map(([date, v]) => ({ date, price: v.price }))
-			.sort((a, b) => a.date.localeCompare(b.date))
-	}, [rows])
-
-	const summaryText = useMemo(() => {
+	const historyStats = useMemo(() => {
 		if (!rows.length) return null
 		const prices = rows.map((r) => r.price).filter((p) => p != null)
-		if (!prices.length) return null
-		const minP = Math.min(...prices)
-		const maxP = Math.max(...prices)
-		return `В выборке ${rows.length} строк, цены от ${money(minP)} до ${money(maxP)}`
+		const posKeys = new Set(rows.map(stableOfferKey))
+		let up = 0
+		let down = 0
+		let same = 0
+		let sumPctUp = 0
+		let sumPctDown = 0
+		for (const r of rows) {
+			if (r._delta == null) continue
+			if (r._delta > 0) {
+				up++
+				if (r._deltaPct != null) sumPctUp += r._deltaPct
+			} else if (r._delta < 0) {
+				down++
+				if (r._deltaPct != null) sumPctDown += Math.abs(r._deltaPct)
+			} else same++
+		}
+		const avgPrice =
+			prices.length > 0
+				? prices.reduce((a, b) => a + b, 0) / prices.length
+				: null
+		return {
+			uniquePositions: posKeys.size,
+			rowCount: rows.length,
+			minP: prices.length ? Math.min(...prices) : null,
+			maxP: prices.length ? Math.max(...prices) : null,
+			avgPrice,
+			up,
+			down,
+			same,
+			avgPctUp: up ? sumPctUp / up : null,
+			avgPctDown: down ? sumPctDown / down : null,
+		}
 	}, [rows])
 
-	const tableColumns = [
-		{
-			title: "Запуск",
-			dataIndex: "run_started",
-			key: "run_started",
-			width: 160,
-			render: (v) => (v ? String(v).replace("T", " ").slice(0, 19) : "—"),
-		},
-		{ title: "Бренд", dataIndex: "brand", key: "brand", width: 90 },
-		{ title: "Модель", dataIndex: "model", key: "model", width: 120 },
-		{ title: "Комплектация", dataIndex: "equipment", key: "equipment", ellipsis: true },
-		{ title: "Город", dataIndex: "city", key: "city", width: 100 },
-		{ title: "Дилер", dataIndex: "dealer", key: "dealer", width: 140, ellipsis: true },
-		{
-			title: "Цена",
-			dataIndex: "price",
-			key: "price",
-			width: 110,
-			render: (v) => money(v),
-		},
-		{
-			title: "Изм.",
-			key: "delta",
-			width: 120,
-			render: (_, r) => {
-				if (r._delta == null) return "—"
-				const down = r._delta < 0
-				return (
-					<Tag color={down ? "green" : r._delta > 0 ? "red" : "default"}>
-						{down ? "" : "+"}
-						{money(r._delta)}
-						{r._deltaPct != null ? ` (${(r._deltaPct * 100).toFixed(1)}%)` : ""}
-					</Tag>
-				)
+	const changeOverview = useMemo(() => {
+		const { newKeys, goneKeys } = newDisappearedBetweenFirstLastRun(rows)
+		let up = 0
+		let down = 0
+		let sumPctUp = 0
+		let sumPctDown = 0
+		for (const r of rows) {
+			if (r._delta == null) continue
+			if (r._delta > 0) {
+				up++
+				if (r._deltaPct != null) sumPctUp += r._deltaPct
+			} else if (r._delta < 0) {
+				down++
+				if (r._deltaPct != null) sumPctDown += Math.abs(r._deltaPct)
+			}
+		}
+		return {
+			up,
+			down,
+			avgPctUp: up ? (sumPctUp / up) * 100 : null,
+			avgPctDown: down ? (sumPctDown / down) * 100 : null,
+			newKeys,
+			goneKeys,
+		}
+	}, [rows])
+
+	const filteredHistoryRows = useMemo(() => {
+		let list = rows
+		const q = tableSearch.trim().toLowerCase()
+		if (q) list = list.filter((r) => rowSearchHaystack(r).includes(q))
+		if (onlyChanged) list = list.filter((r) => r._delta != null)
+		if (deltaFilter === "up") list = list.filter((r) => r._delta != null && r._delta > 0)
+		if (deltaFilter === "down")
+			list = list.filter((r) => r._delta != null && r._delta < 0)
+		if (deltaFilter === "same")
+			list = list.filter((r) => r._delta != null && r._delta === 0)
+		return list
+	}, [rows, tableSearch, onlyChanged, deltaFilter])
+
+	const groupedHistoryParents = useMemo(() => {
+		if (tableView === "flat") return null
+		const map = new Map()
+		for (const r of filteredHistoryRows) {
+			const gkey =
+				tableView === "dealer"
+					? String(r.dealer || "—")
+					: `${r.brand || "—"}::${r.model || "—"}`
+			if (!map.has(gkey)) {
+				map.set(gkey, {
+					key: gkey,
+					groupTitle: gkey.includes("::")
+						? gkey.replace("::", " — ")
+						: gkey,
+					children: [],
+				})
+			}
+			map.get(gkey).children.push(r)
+		}
+		const out = []
+		for (const g of map.values()) {
+			const ch = g.children
+			const priced = ch.map((x) => x.price).filter((p) => p != null)
+			const minP = priced.length ? Math.min(...priced) : null
+			const maxP = priced.length ? Math.max(...priced) : null
+			const changes = ch.filter((x) => x._delta != null && x._delta !== 0).length
+			out.push({
+				...g,
+				childCount: ch.length,
+				minP,
+				maxP,
+				changes,
+			})
+		}
+		out.sort((a, b) => b.childCount - a.childCount)
+		return out
+	}, [filteredHistoryRows, tableView])
+
+	const chartPack = useMemo(
+		() => buildChartPack(rows, chartLineMode, chartMetric, 10),
+		[rows, chartLineMode, chartMetric],
+	)
+
+	const chartPrevMap = useMemo(() => {
+		const { data, series } = chartPack
+		const m = new Map()
+		for (let i = 1; i < data.length; i++) {
+			const prev = data[i - 1]
+			const cur = data[i]
+			for (const s of series) {
+				const pk = `${cur.date}::${s.key}`
+				const a = prev[s.key]
+				const b = cur[s.key]
+				if (
+					a != null &&
+					b != null &&
+					typeof a === "number" &&
+					typeof b === "number"
+				) {
+					m.set(pk, b - a)
+				}
+			}
+		}
+		return m
+	}, [chartPack])
+
+	const tableColumns = useMemo(
+		() => [
+			{
+				title: "Запуск",
+				dataIndex: "run_started",
+				key: "run_started",
+				width: 160,
+				sorter: (a, b) =>
+					String(a.run_started || "").localeCompare(String(b.run_started || "")),
+				render: (v) => (v ? String(v).replace("T", " ").slice(0, 19) : "—"),
 			},
-		},
-	]
+			{
+				title: "Бренд",
+				dataIndex: "brand",
+				key: "brand",
+				width: 90,
+				sorter: (a, b) => String(a.brand || "").localeCompare(String(b.brand || ""), "ru"),
+			},
+			{
+				title: "Модель",
+				dataIndex: "model",
+				key: "model",
+				width: 120,
+				sorter: (a, b) => String(a.model || "").localeCompare(String(b.model || ""), "ru"),
+			},
+			{
+				title: "Комплектация",
+				dataIndex: "equipment",
+				key: "equipment",
+				ellipsis: true,
+				sorter: (a, b) =>
+					String(a.equipment || "").localeCompare(String(b.equipment || ""), "ru"),
+			},
+			{
+				title: "Город",
+				dataIndex: "city",
+				key: "city",
+				width: 100,
+				sorter: (a, b) => String(a.city || "").localeCompare(String(b.city || ""), "ru"),
+			},
+			{
+				title: "Дилер",
+				dataIndex: "dealer",
+				key: "dealer",
+				width: 140,
+				ellipsis: true,
+				sorter: (a, b) =>
+					String(a.dealer || "").localeCompare(String(b.dealer || ""), "ru"),
+			},
+			{
+				title: "Цена",
+				dataIndex: "price",
+				key: "price",
+				width: 110,
+				sorter: (a, b) => (a.price ?? 0) - (b.price ?? 0),
+				render: (v) => money(v),
+			},
+			{
+				title: "Изм.",
+				key: "delta",
+				width: 130,
+				sorter: (a, b) => (a._delta ?? 0) - (b._delta ?? 0),
+				render: (_, r) => {
+					if (r._delta == null) return "—"
+					const down = r._delta < 0
+					return (
+						<Tag color={down ? "green" : r._delta > 0 ? "red" : "default"}>
+							{down ? "" : "+"}
+							{money(r._delta)}
+							{r._deltaPct != null ? ` (${(r._deltaPct * 100).toFixed(1)}%)` : ""}
+						</Tag>
+					)
+				},
+			},
+		],
+		[],
+	)
+
+	const groupParentColumns = useMemo(
+		() => [
+			{
+				title: tableView === "dealer" ? "Дилер" : "Бренд — модель",
+				dataIndex: "groupTitle",
+				key: "groupTitle",
+				render: (t) => <Text strong>{t}</Text>,
+			},
+			{
+				title: "Строк",
+				dataIndex: "childCount",
+				key: "childCount",
+				width: 80,
+			},
+			{
+				title: "Мин. цена",
+				key: "minP",
+				width: 110,
+				render: (_, r) => money(r.minP),
+			},
+			{
+				title: "Макс. цена",
+				key: "maxP",
+				width: 110,
+				render: (_, r) => money(r.maxP),
+			},
+			{
+				title: "С изм. цены",
+				dataIndex: "changes",
+				key: "changes",
+				width: 100,
+			},
+		],
+		[tableView],
+	)
 
 	const runOptions = (runs || []).map((r) => ({
 		value: r.id,
@@ -270,9 +628,9 @@ export function PriceHistory() {
 		const file = ev.target.files?.[0]
 		ev.target.value = ""
 		if (!file) return
-		const rows = await parseXlsxFile(file)
-		if (!rows) return
-		setXlsxPick((p) => ({ ...p, [which]: { name: file.name, rows } }))
+		const xrows = await parseXlsxFile(file)
+		if (!xrows) return
+		setXlsxPick((p) => ({ ...p, [which]: { name: file.name, rows: xrows } }))
 		message.success(`${which === "a" ? "A" : "B"}: ${file.name}`)
 	}
 
@@ -287,46 +645,177 @@ export function PriceHistory() {
 		message.success("Сравнение XLSX выполнено")
 	}
 
-	const diffColumns = [
-		{ title: "Тип", dataIndex: "change", key: "change", width: 100,
-			render: (c) => {
-				const map = {
-					added: { color: "gold", label: "Новое" },
-					removed: { color: "default", label: "Исчезло" },
-					price: { color: "processing", label: "Цена" },
-					unchanged: { color: "default", label: "Без изм." },
-				}
-				const x = map[c] || map.unchanged
-				return <Tag color={x.color}>{x.label}</Tag>
+	const diffMeta = useMemo(() => {
+		const brands = uniqueVals(diffRows, (r) => r.brand)
+		const models = uniqueVals(diffRows, (r) => r.model)
+		const dealers = uniqueVals(diffRows, (r) => r.dealer)
+		return { brands, models, dealers }
+	}, [diffRows])
+
+	const diffFiltered = useMemo(() => {
+		let list = diffRows
+		if (diffBrands.length)
+			list = list.filter((r) => diffBrands.includes(String(r.brand)))
+		if (diffModels.length)
+			list = list.filter((r) => diffModels.includes(String(r.model)))
+		if (diffDealers.length)
+			list = list.filter((r) => diffDealers.includes(String(r.dealer)))
+		const q = diffSearch.trim().toLowerCase()
+		if (q) {
+			list = list.filter((r) =>
+				[
+					r.brand,
+					r.model,
+					r.equipment,
+					r.modification,
+					String(r.year ?? ""),
+					r.city,
+					r.dealer,
+					r.change,
+				]
+					.join(" ")
+					.toLowerCase()
+					.includes(q),
+			)
+		}
+		if (diffChangeFilter !== "all") {
+			list = list.filter((r) => r.change === diffChangeFilter)
+		}
+		return list
+	}, [diffRows, diffBrands, diffModels, diffDealers, diffSearch, diffChangeFilter])
+
+	const diffSummary = useMemo(() => {
+		const priceRows = diffFiltered.filter((r) => r.change === "price")
+		let up = 0
+		let down = 0
+		let sumPct = 0
+		for (const r of priceRows) {
+			if (r.pct == null) continue
+			if (r.pct > 0) up++
+			else if (r.pct < 0) down++
+			sumPct += r.pct
+		}
+		const n = priceRows.length
+		return {
+			added: diffFiltered.filter((r) => r.change === "added").length,
+			removed: diffFiltered.filter((r) => r.change === "removed").length,
+			price: priceRows.length,
+			unchanged: diffFiltered.filter((r) => r.change === "unchanged").length,
+			priceUp: up,
+			priceDown: down,
+			avgPct: n ? (sumPct / n) * 100 : null,
+		}
+	}, [diffFiltered])
+
+	const diffGroupedParents = useMemo(() => {
+		if (diffGroupView === "flat") return null
+		const map = new Map()
+		for (const r of diffFiltered) {
+			const gkey =
+				diffGroupView === "dealer"
+					? String(r.dealer || "—")
+					: String(r.brand || "—")
+			if (!map.has(gkey)) map.set(gkey, { key: gkey, groupTitle: gkey, children: [] })
+			map.get(gkey).children.push(r)
+		}
+		return [...map.values()].map((g) => ({
+			...g,
+			childCount: g.children.length,
+		}))
+	}, [diffFiltered, diffGroupView])
+
+	const diffColumns = useMemo(
+		() => [
+			{
+				title: "Тип",
+				dataIndex: "change",
+				key: "change",
+				width: 100,
+				sorter: (a, b) => String(a.change).localeCompare(String(b.change)),
+				render: (c) => {
+					const map = {
+						added: { color: "gold", label: "Новое" },
+						removed: { color: "default", label: "Исчезло" },
+						price: { color: "processing", label: "Цена" },
+						unchanged: { color: "default", label: "Без изм." },
+					}
+					const x = map[c] || map.unchanged
+					return <Tag color={x.color}>{x.label}</Tag>
+				},
 			},
-		},
-		{ title: "Бренд", dataIndex: "brand", key: "brand", width: 90 },
-		{ title: "Модель", dataIndex: "model", key: "model", width: 110 },
-		{ title: "Комплектация", dataIndex: "equipment", key: "equipment", ellipsis: true },
-		{ title: "Город", dataIndex: "city", key: "city", width: 90 },
-		{ title: "Дилер", dataIndex: "dealer", key: "dealer", width: 120, ellipsis: true },
-		{
-			title: "Цена A",
-			dataIndex: "priceA",
-			key: "priceA",
-			width: 100,
-			render: (v) => money(v),
-		},
-		{
-			title: "Цена B",
-			dataIndex: "priceB",
-			key: "priceB",
-			width: 100,
-			render: (v) => money(v),
-		},
-		{
-			title: "%",
-			dataIndex: "pct",
-			key: "pct",
-			width: 80,
-			render: (v) => (v == null ? "—" : pct(v)),
-		},
-	]
+			{
+				title: "Бренд",
+				dataIndex: "brand",
+				key: "brand",
+				width: 90,
+				sorter: (a, b) => String(a.brand || "").localeCompare(String(b.brand || ""), "ru"),
+			},
+			{
+				title: "Модель",
+				dataIndex: "model",
+				key: "model",
+				width: 110,
+				sorter: (a, b) => String(a.model || "").localeCompare(String(b.model || ""), "ru"),
+			},
+			{
+				title: "Комплектация",
+				dataIndex: "equipment",
+				key: "equipment",
+				ellipsis: true,
+			},
+			{
+				title: "Город",
+				dataIndex: "city",
+				key: "city",
+				width: 90,
+			},
+			{
+				title: "Дилер",
+				dataIndex: "dealer",
+				key: "dealer",
+				width: 120,
+				ellipsis: true,
+			},
+			{
+				title: "Цена A",
+				dataIndex: "priceA",
+				key: "priceA",
+				width: 100,
+				sorter: (a, b) => (a.priceA ?? 0) - (b.priceA ?? 0),
+				render: (v) => money(v),
+			},
+			{
+				title: "Цена B",
+				dataIndex: "priceB",
+				key: "priceB",
+				width: 100,
+				sorter: (a, b) => (a.priceB ?? 0) - (b.priceB ?? 0),
+				render: (v) => money(v),
+			},
+			{
+				title: "%",
+				dataIndex: "pct",
+				key: "pct",
+				width: 80,
+				sorter: (a, b) => (a.pct ?? 0) - (b.pct ?? 0),
+				render: (v) => (v == null ? "—" : pct(v)),
+			},
+		],
+		[],
+	)
+
+	const diffGroupColumns = useMemo(
+		() => [
+			{
+				title: diffGroupView === "dealer" ? "Дилер" : "Бренд",
+				dataIndex: "groupTitle",
+				key: "groupTitle",
+				render: (t) => <Text strong>{t}</Text>,
+			},
+			{ title: "Строк", dataIndex: "childCount", key: "childCount", width: 80 },
+		],
+		[diffGroupView],
+	)
 
 	const exportJson = async () => {
 		if (!electron?.priceHistoryExport) return
@@ -372,6 +861,65 @@ export function PriceHistory() {
 			return false
 		},
 		showUploadList: false,
+	}
+
+	const chartTitleText =
+		chartMetric === "count"
+			? chartLineMode === "overall"
+				? "Количество предложений по дням (вся выборка)"
+				: chartLineMode === "dealer"
+					? "Количество предложений по дням (топ дилеров)"
+					: "Количество предложений по дням (топ бренд — модель)"
+			: chartLineMode === "overall"
+				? "Минимальная цена по дню среди выбранных фильтров"
+				: chartLineMode === "dealer"
+					? "Минимальная цена по дню и дилеру (топ-10 по числу строк)"
+					: "Минимальная цена по дню и модели (топ-10 по числу строк)"
+
+	const chartTooltip = ({ active, payload, label }) => {
+		if (!active || !payload?.length) return null
+		return (
+			<div
+				style={{
+					background: "#fff",
+					border: "1px solid #eee",
+					padding: 8,
+					fontSize: 12,
+				}}
+			>
+				<div style={{ marginBottom: 4 }}>
+					<Text strong>Дата: {label}</Text>
+				</div>
+				{payload.map((p) => {
+					const s = chartPack.series.find((x) => x.key === p.dataKey)
+					const name = s?.label || String(p.dataKey)
+					const pk = `${label}::${p.dataKey}`
+					const dlt = chartPrevMap.get(pk)
+					const v = p.value
+					const formatted =
+						chartMetric === "count"
+							? v != null
+								? String(v)
+								: "—"
+							: v != null
+								? `${Number(v).toLocaleString("ru-RU")} ₽`
+								: "—"
+					return (
+						<div key={String(p.dataKey)} style={{ marginTop: 2 }}>
+							<span style={{ color: p.color }}>{name}: </span>
+							{formatted}
+							{chartMetric === "price" && dlt != null ? (
+								<span style={{ color: dlt <= 0 ? "#52c41a" : "#cf1322" }}>
+									{" "}
+									(Δ {dlt > 0 ? "+" : ""}
+									{Math.round(dlt).toLocaleString("ru-RU")} ₽)
+								</span>
+							) : null}
+						</div>
+					)
+				})}
+			</div>
+		)
 	}
 
 	return (
@@ -461,12 +1009,109 @@ export function PriceHistory() {
 						<Button icon={<UploadOutlined />}>Импорт JSON</Button>
 					</Upload>
 				</Space>
-				{summaryText ? (
-					<div style={{ marginTop: 12 }}>
-						<Text type="secondary">{summaryText}</Text>
-					</div>
+
+				{historyStats ? (
+					<Row gutter={[12, 12]} style={{ marginTop: 16 }}>
+						<Col xs={12} sm={8} md={4}>
+							<Statistic title="Уникальных позиций" value={historyStats.uniquePositions} />
+						</Col>
+						<Col xs={12} sm={8} md={4}>
+							<Statistic title="Строк в выборке" value={historyStats.rowCount} />
+						</Col>
+						<Col xs={12} sm={8} md={4}>
+							<Statistic
+								title="Мин. цена"
+								value={
+									historyStats.minP != null
+										? Math.round(historyStats.minP)
+										: "—"
+								}
+								suffix={historyStats.minP != null ? "₽" : undefined}
+							/>
+						</Col>
+						<Col xs={12} sm={8} md={4}>
+							<Statistic
+								title="Макс. цена"
+								value={
+									historyStats.maxP != null
+										? Math.round(historyStats.maxP)
+										: "—"
+								}
+								suffix={historyStats.maxP != null ? "₽" : undefined}
+							/>
+						</Col>
+						<Col xs={12} sm={8} md={4}>
+							<Statistic
+								title="Средняя цена"
+								value={
+									historyStats.avgPrice != null
+										? Math.round(historyStats.avgPrice)
+										: "—"
+								}
+								suffix={historyStats.avgPrice != null ? "₽" : undefined}
+							/>
+						</Col>
+						<Col xs={12} sm={8} md={4}>
+							<Statistic
+								title="Строк с Δ цены"
+								value={historyStats.up + historyStats.down}
+								valueStyle={{ color: "#1677ff" }}
+							/>
+						</Col>
+					</Row>
 				) : null}
 			</Card>
+
+			{rows.length > 0 ? (
+				<Card size="small" style={{ marginBottom: 16 }} title="Что изменилось (в периоде)">
+					<Row gutter={[12, 12]}>
+						<Col xs={12} sm={6}>
+							<Card size="small" bordered={false} style={{ background: "#fff1f0" }}>
+								<Statistic
+									title="Цены выросли"
+									value={changeOverview.up}
+									suffix={
+										changeOverview.avgPctUp != null
+											? `ср. +${changeOverview.avgPctUp.toFixed(1)}%`
+											: undefined
+									}
+									valueStyle={{ color: "#cf1322" }}
+								/>
+							</Card>
+						</Col>
+						<Col xs={12} sm={6}>
+							<Card size="small" bordered={false} style={{ background: "#f6ffed" }}>
+								<Statistic
+									title="Цены снизились"
+									value={changeOverview.down}
+									suffix={
+										changeOverview.avgPctDown != null
+											? `ср. −${changeOverview.avgPctDown.toFixed(1)}%`
+											: undefined
+									}
+									valueStyle={{ color: "#52c41a" }}
+								/>
+							</Card>
+						</Col>
+						<Col xs={12} sm={6}>
+							<Card size="small" bordered={false} style={{ background: "#fffbe6" }}>
+								<Statistic
+									title="Новые позиции (последний vs первый запуск в выборке)"
+									value={changeOverview.newKeys}
+								/>
+							</Card>
+						</Col>
+						<Col xs={12} sm={6}>
+							<Card size="small" bordered={false} style={{ background: "#fafafa" }}>
+								<Statistic
+									title="Исчезли (последний vs первый запуск)"
+									value={changeOverview.goneKeys}
+								/>
+							</Card>
+						</Col>
+					</Row>
+				</Card>
+			) : null}
 
 			<Tabs
 				activeKey={tab}
@@ -476,49 +1121,161 @@ export function PriceHistory() {
 						key: "table",
 						label: "Таблица",
 						children: (
-							<Table
-								size="small"
-								rowKey={(r) =>
-									`${r.id ?? r.run_id}-${stableOfferKey(r)}`
-								}
-								columns={tableColumns}
-								dataSource={rows}
-								loading={loading}
-								pagination={{ pageSize: 20, showSizeChanger: true }}
-								scroll={{ x: 1100 }}
-							/>
+							<Space direction="vertical" style={{ width: "100%" }} size="middle">
+								<Space wrap align="center">
+									<Text type="secondary">Вид:</Text>
+									<Segmented
+										value={tableView}
+										onChange={setTableView}
+										options={[
+											{ label: "Плоский список", value: "flat" },
+											{ label: "По дилерам", value: "dealer" },
+											{ label: "По бренду — модель", value: "brandModel" },
+										]}
+									/>
+									<Segmented
+										value={deltaFilter}
+										onChange={setDeltaFilter}
+										options={[
+											{ label: "Все Δ", value: "all" },
+											{ label: "Рост", value: "up" },
+											{ label: "Снижение", value: "down" },
+											{ label: "Без изм.", value: "same" },
+										]}
+									/>
+									<Checkbox
+										checked={onlyChanged}
+										onChange={(e) => setOnlyChanged(e.target.checked)}
+									>
+										Только с изменением цены
+									</Checkbox>
+									<Input.Search
+										allowClear
+										placeholder="Поиск по таблице"
+										style={{ minWidth: 220 }}
+										value={tableSearch}
+										onChange={(e) => setTableSearch(e.target.value)}
+									/>
+								</Space>
+								{tableView === "flat" ? (
+									<Table
+										size="small"
+										rowKey={(r) => `${r.id ?? r.run_id}-${stableOfferKey(r)}`}
+										columns={tableColumns}
+										dataSource={filteredHistoryRows}
+										loading={loading}
+										pagination={{ pageSize: 20, showSizeChanger: true }}
+										scroll={{ x: 1200 }}
+									/>
+								) : (
+									<Table
+										size="small"
+										rowKey="key"
+										columns={groupParentColumns}
+										dataSource={groupedHistoryParents || []}
+										pagination={{ pageSize: 15, showSizeChanger: true }}
+										expandable={{
+											expandedRowRender: (rec) => (
+												<Table
+													size="small"
+													rowKey={(r) =>
+														`${r.id ?? r.run_id}-${stableOfferKey(r)}`
+													}
+													columns={tableColumns}
+													dataSource={rec.children}
+													pagination={false}
+													scroll={{ x: 1200 }}
+												/>
+											),
+										}}
+									/>
+								)}
+							</Space>
 						),
 					},
 					{
 						key: "chart",
 						label: "График",
-						children: chartData.length ? (
-							<ResponsiveContainer width="100%" height={320}>
-								<LineChart data={chartData}>
-									<CartesianGrid strokeDasharray="3 3" />
-									<XAxis dataKey="date" tick={{ fontSize: 12 }} />
-									<YAxis
-										tick={{ fontSize: 12 }}
-										tickFormatter={(v) =>
-											v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v
-										}
+						children: (
+							<Space direction="vertical" style={{ width: "100%" }} size="middle">
+								<Space wrap>
+									<Text type="secondary">Режим линий:</Text>
+									<Segmented
+										value={chartLineMode}
+										onChange={setChartLineMode}
+										options={[
+											{ label: "Общая", value: "overall" },
+											{ label: "По дилерам", value: "dealer" },
+											{ label: "По моделям", value: "model" },
+										]}
 									/>
-									<Tooltip
-										formatter={(v) => [`${Number(v).toLocaleString("ru-RU")} ₽`, "Мин. цена"]}
-										labelFormatter={(l) => `Дата: ${l}`}
+									<Text type="secondary">Метрика:</Text>
+									<Segmented
+										value={chartMetric}
+										onChange={setChartMetric}
+										options={[
+											{ label: "Цены (мин.)", value: "price" },
+											{ label: "Количество", value: "count" },
+										]}
 									/>
-									<Line
-										type="monotone"
-										dataKey="price"
-										stroke={token.colorPrimary}
-										strokeWidth={2}
-										dot={{ r: 3 }}
-										activeDot={{ r: 5 }}
-									/>
-								</LineChart>
-							</ResponsiveContainer>
-						) : (
-							<Text type="secondary">Нет данных для графика</Text>
+								</Space>
+								<Text type="secondary">{chartTitleText}</Text>
+								{chartPack.data.length ? (
+									chartMetric === "count" ? (
+										<ResponsiveContainer width="100%" height={360}>
+											<BarChart data={chartPack.data}>
+												<CartesianGrid strokeDasharray="3 3" />
+												<XAxis dataKey="date" tick={{ fontSize: 11 }} />
+												<YAxis tick={{ fontSize: 11 }} />
+												<Tooltip content={chartTooltip} />
+												<Legend />
+												{chartPack.series.map((s, i) => (
+													<Bar
+														key={s.key}
+														dataKey={s.key}
+														name={s.label}
+														fill={CHART_COLORS[i % CHART_COLORS.length]}
+													/>
+												))}
+											</BarChart>
+										</ResponsiveContainer>
+									) : (
+										<ResponsiveContainer width="100%" height={360}>
+											<LineChart data={chartPack.data}>
+												<CartesianGrid strokeDasharray="3 3" />
+												<XAxis dataKey="date" tick={{ fontSize: 11 }} />
+												<YAxis
+													tick={{ fontSize: 11 }}
+													tickFormatter={(v) =>
+														v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v
+													}
+												/>
+												<Tooltip content={chartTooltip} />
+												<Legend />
+												{chartPack.series.map((s, i) => (
+													<Line
+														key={s.key}
+														type="monotone"
+														dataKey={s.key}
+														name={s.label}
+														stroke={CHART_COLORS[i % CHART_COLORS.length]}
+														strokeWidth={2}
+														dot={{ r: 2 }}
+														connectNulls
+													/>
+												))}
+											</LineChart>
+										</ResponsiveContainer>
+									)
+								) : (
+									<Text type="secondary">Нет данных для графика</Text>
+								)}
+								<Text type="secondary" style={{ fontSize: 12 }}>
+									По оси X — день запуска (дата из поля «Запуск»). Для режимов
+									«По дилерам» / «По моделям» показаны до 10 рядов с наибольшим
+									числом строк в выборке.
+								</Text>
+							</Space>
 						),
 					},
 					{
@@ -580,14 +1337,125 @@ export function PriceHistory() {
 										<Button onClick={runXlsxDiff}>Сравнить XLSX</Button>
 									</Space>
 								</Card>
-								<Table
-									size="small"
-									rowKey="key"
-									columns={diffColumns}
-									dataSource={diffRows}
-									pagination={{ pageSize: 15, showSizeChanger: true }}
-									scroll={{ x: 1000 }}
-								/>
+
+								{diffRows.length > 0 ? (
+									<>
+										<Row gutter={[12, 12]}>
+											<Col xs={12} sm={6}>
+												<Statistic title="Новое" value={diffSummary.added} />
+											</Col>
+											<Col xs={12} sm={6}>
+												<Statistic title="Исчезло" value={diffSummary.removed} />
+											</Col>
+											<Col xs={12} sm={6}>
+												<Statistic title="Изменение цены" value={diffSummary.price} />
+											</Col>
+											<Col xs={12} sm={6}>
+												<Statistic
+													title="Ср. % (цена A→B)"
+													value={
+														diffSummary.avgPct != null
+															? diffSummary.avgPct.toFixed(1)
+															: "—"
+													}
+													suffix={diffSummary.avgPct != null ? "%" : undefined}
+												/>
+											</Col>
+										</Row>
+										<Text type="secondary" style={{ fontSize: 12 }}>
+											Рост цены: {diffSummary.priceUp}, снижение:{" "}
+											{diffSummary.priceDown} (по строкам с типом «Цена» в
+											текущих фильтрах)
+										</Text>
+										<Space wrap align="center">
+											<Select
+												mode="multiple"
+												allowClear
+												placeholder="Бренд"
+												style={{ minWidth: 140 }}
+												options={diffMeta.brands.map((b) => ({ value: b, label: b }))}
+												value={diffBrands}
+												onChange={setDiffBrands}
+											/>
+											<Select
+												mode="multiple"
+												allowClear
+												placeholder="Модель"
+												style={{ minWidth: 140 }}
+												options={diffMeta.models.map((m) => ({ value: m, label: m }))}
+												value={diffModels}
+												onChange={setDiffModels}
+											/>
+											<Select
+												mode="multiple"
+												allowClear
+												placeholder="Дилер"
+												style={{ minWidth: 160 }}
+												options={diffMeta.dealers.map((d) => ({ value: d, label: d }))}
+												value={diffDealers}
+												onChange={setDiffDealers}
+											/>
+											<Segmented
+												value={diffChangeFilter}
+												onChange={setDiffChangeFilter}
+												options={[
+													{ label: "Все", value: "all" },
+													{ label: "Новое", value: "added" },
+													{ label: "Исчезло", value: "removed" },
+													{ label: "Цена", value: "price" },
+													{ label: "Без изм.", value: "unchanged" },
+												]}
+											/>
+											<Segmented
+												value={diffGroupView}
+												onChange={setDiffGroupView}
+												options={[
+													{ label: "Плоский список", value: "flat" },
+													{ label: "По дилеру", value: "dealer" },
+													{ label: "По бренду", value: "brand" },
+												]}
+											/>
+											<Input.Search
+												allowClear
+												placeholder="Поиск"
+												style={{ minWidth: 200 }}
+												value={diffSearch}
+												onChange={(e) => setDiffSearch(e.target.value)}
+											/>
+										</Space>
+									</>
+								) : null}
+
+								{diffGroupView === "flat" ? (
+									<Table
+										size="small"
+										rowKey="key"
+										columns={diffColumns}
+										dataSource={diffFiltered}
+										pagination={{ pageSize: 15, showSizeChanger: true }}
+										scroll={{ x: 1000 }}
+									/>
+								) : (
+									<Table
+										size="small"
+										rowKey="key"
+										columns={diffGroupColumns}
+										dataSource={diffGroupedParents || []}
+										pagination={{ pageSize: 12, showSizeChanger: true }}
+										expandable={{
+											expandedRowRender: (rec) => (
+												<Table
+													size="small"
+													rowKey="key"
+													columns={diffColumns}
+													dataSource={rec.children}
+													pagination={false}
+													scroll={{ x: 1000 }}
+												/>
+											),
+										}}
+									/>
+								)}
 							</Space>
 						),
 					},

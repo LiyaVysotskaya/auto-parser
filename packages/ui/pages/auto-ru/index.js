@@ -16,6 +16,7 @@ import {
 	Button,
 	Card,
 	Col,
+	Divider,
 	Progress,
 	Row,
 	Segmented,
@@ -73,14 +74,6 @@ function formatDuration(ms) {
 	if (hh) return `${hh}ч ${mm}м ${ss}с`
 	if (mm) return `${mm}м ${ss}с`
 	return `${ss}с`
-}
-
-function rubCompact(n) {
-	if (n == null || !Number.isFinite(n)) return "—"
-	const x = Math.abs(n)
-	if (x >= 1e6) return `${(n / 1e6).toFixed(1).replace(".", ",")} млн ₽`
-	if (x >= 1e3) return `${Math.round(n / 1e3)} тыс ₽`
-	return `${Math.round(n)} ₽`
 }
 
 export function AutoRu() {
@@ -222,13 +215,25 @@ export function AutoRu() {
 					const t = String(r.run_started || "")
 					if (!t) continue
 					const cur = byRun.get(t)
-					if (cur == null || r.price < cur) byRun.set(t, r.price)
+					if (cur == null || r.price < cur.price) {
+						byRun.set(t, {
+							price: r.price,
+							brand: r.brand,
+							model: r.model,
+							dealer: r.dealer,
+							city: r.city,
+						})
+					}
 				}
 				const pts = [...byRun.entries()]
 					.sort((a, b) => a[0].localeCompare(b[0]))
-					.map(([started, price]) => ({
+					.map(([started, m]) => ({
 						label: dateFns.format(new Date(started), "d.MM"),
-						value: Math.round(price / 1000),
+						value: Math.round(m.price / 1000),
+						brand: m.brand,
+						model: m.model,
+						dealer: m.dealer,
+						city: m.city,
 					}))
 				setLineSeries(pts)
 			}
@@ -254,13 +259,6 @@ export function AutoRu() {
 		}
 	}, [])
 
-	const minPriceLabel = useMemo(() => {
-		const priced = rowsFlat.filter((r) => r.price != null)
-		if (!priced.length) return "—"
-		const m = priced.reduce((a, b) => (a.price <= b.price ? a : b))
-		return `${m.model || "—"} · ${m.dealer || ""}`.trim()
-	}, [rowsFlat])
-
 	const lineDeltaHint = useMemo(() => {
 		if (lineSeries.length < 2) return null
 		const a = lineSeries[0].value
@@ -282,6 +280,23 @@ export function AutoRu() {
 		return `${up} выросли · ${down} снизились (в подборке)`
 	}, [priceMoves])
 
+	const lineLastContext = useMemo(() => {
+		if (!lineSeries.length) return null
+		const p = lineSeries[lineSeries.length - 1]
+		const car = [p.brand, p.model].filter(Boolean).join(" ").trim()
+		const dealer = p.dealer && String(p.dealer).trim()
+		const city =
+			p.city != null && String(p.city).trim() && String(p.city).trim() !== "—"
+				? String(p.city).trim()
+				: ""
+		if (!car && !dealer && !city) return null
+		const parts = []
+		if (car) parts.push(car)
+		if (dealer) parts.push(dealer)
+		if (city) parts.push(city)
+		return `Последняя точка (${p.label}): ${parts.join(" · ")}`
+	}, [lineSeries])
+
 	return (
 		<Space
 			direction="vertical"
@@ -289,81 +304,97 @@ export function AutoRu() {
 			size={14}
 		>
 			<div className="ms-dash-actions">
-				<Space
-					wrap
-					style={{ width: "100%", justifyContent: "flex-end" }}
-				>
-					<Button
-						icon={<DownloadOutlined />}
-						onClick={() => navigate("/auto-ru/report")}
-					>
-						Отчёт
-					</Button>
-					<Button
-						icon={<DownloadOutlined />}
-						onClick={() => {
-							XLSX.writeFile(
-								xlsx(autoRuState.report || []),
-								reportName(autoRuState.report || [], "xlsx"),
-							)
-						}}
-						disabled={!autoRuState.report?.length}
-					>
-						Скачать XLSX
-					</Button>
-					<input
-						ref={uploadReportInputRef}
-						type="file"
-						accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-						style={{ display: "none" }}
-						onChange={async (ev) => {
-							const file = ev.target.files?.[0]
-							if (!file) return
-							try {
-								const buf = await file.arrayBuffer()
-								const parsed = parseXlsx(buf)
-								if (!parsed.length) {
-									message.error(
-										"Не удалось прочитать файл: нет листов с ожидаемыми заголовками столбцов",
-									)
-									return
-								}
-								dispatch(appStore.autoRu.slice.actions.report(parsed))
-								message.success(`Отчёт загружен: ${parsed.length} лист(ов).`)
-							} catch (err) {
-								console.error(err)
+				<input
+					ref={uploadReportInputRef}
+					type="file"
+					accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+					style={{ display: "none" }}
+					onChange={async (ev) => {
+						const file = ev.target.files?.[0]
+						if (!file) return
+						try {
+							const buf = await file.arrayBuffer()
+							const parsed = parseXlsx(buf)
+							if (!parsed.length) {
 								message.error(
-									`Ошибка чтения XLSX: ${err?.message || String(err)}`,
+									"Не удалось прочитать файл: нет листов с ожидаемыми заголовками столбцов",
 								)
-							} finally {
-								if (uploadReportInputRef.current)
-									uploadReportInputRef.current.value = ""
+								return
 							}
-						}}
+							dispatch(appStore.autoRu.slice.actions.report(parsed))
+							message.success(`Отчёт загружен: ${parsed.length} лист(ов).`)
+						} catch (err) {
+							console.error(err)
+							message.error(
+								`Ошибка чтения XLSX: ${err?.message || String(err)}`,
+							)
+						} finally {
+							if (uploadReportInputRef.current)
+								uploadReportInputRef.current.value = ""
+						}
+					}}
+				/>
+				<div className="ms-dash-actions-row">
+					<Space
+						wrap
+						className="ms-parser-run-btns"
+					>
+						<Button
+							type="primary"
+							size="large"
+							icon={<PlayCircleOutlined />}
+							className="ms-parser-start-btn"
+							onClick={() => electron?.autoRu()}
+							disabled={isPending}
+						>
+							Старт
+						</Button>
+						<Button
+							danger
+							size="large"
+							variant={isPending ? "solid" : "outlined"}
+							icon={<StopOutlined />}
+							className="ms-parser-stop-btn"
+							onClick={() => electron?.autoRuCancel?.()}
+							disabled={!isPending}
+						>
+							Стоп
+						</Button>
+					</Space>
+					<Divider
+						type="vertical"
+						className="ms-dash-actions-divider"
 					/>
-					<Button
-						icon={<UploadOutlined />}
-						onClick={() => uploadReportInputRef.current?.click()}
+					<Space
+						wrap
+						className="ms-dash-actions-secondary"
 					>
-						Загрузить
-					</Button>
-					<Button
-						type="primary"
-						icon={<PlayCircleOutlined />}
-						onClick={() => electron?.autoRu()}
-						disabled={isPending}
-					>
-						Старт
-					</Button>
-					<Button
-						danger
-						icon={<StopOutlined />}
-						onClick={() => electron?.autoRuCancel?.()}
-						disabled={!isPending}
-					>
-						Стоп
-					</Button>
-				</Space>
+						<Button
+							icon={<DownloadOutlined />}
+							onClick={() => navigate("/auto-ru/report")}
+						>
+							Отчёт
+						</Button>
+						<Button
+							icon={<DownloadOutlined />}
+							onClick={() => {
+								XLSX.writeFile(
+									xlsx(autoRuState.report || []),
+									reportName(autoRuState.report || [], "xlsx"),
+								)
+							}}
+							disabled={!autoRuState.report?.length}
+						>
+							Скачать XLSX
+						</Button>
+						<Button
+							icon={<UploadOutlined />}
+							onClick={() => uploadReportInputRef.current?.click()}
+						>
+							Загрузить
+						</Button>
+					</Space>
+				</div>
 			</div>
 
 			{isPending ? (
@@ -391,8 +422,98 @@ export function AutoRu() {
 				</Card>
 			) : null}
 
-			<div className="ms-stat-grid">
-				<div className="ms-stat-tile">
+			<Card
+				className="ms-toolbar-card ms-dash-card"
+				size="small"
+				title="Настройки парсинга и отчёт"
+			>
+				<div className="ms-cockpit-g3 ms-cockpit-g3--embedded">
+					<Card
+						className="ms-dash-card"
+						size="small"
+						title="Бренды"
+						extra={
+							<Button
+								type="link"
+								size="small"
+								onClick={() => navigate("/auto-ru/settings")}
+							>
+								Изменить
+							</Button>
+						}
+					>
+						<Text
+							type="secondary"
+							style={{ fontSize: 12 }}
+						>
+							Выбрано {selectedCount} из {totalBrands}
+						</Text>
+						<div className="ms-brand-tags">
+							{(settings.brands || []).slice(0, 14).map((b) => (
+								<Tag
+									key={b.id}
+									className="ms-brand-tag"
+									color={b.selected ? "blue" : "default"}
+								>
+									{b.name}
+								</Tag>
+							))}
+						</div>
+					</Card>
+					<Card
+						className="ms-dash-card"
+						size="small"
+						title="Годы"
+					>
+						<Statistic
+							title="Диапазон"
+							value={yearsText}
+						/>
+					</Card>
+					<Card
+						className="ms-dash-card"
+						size="small"
+						title="Каталог"
+					>
+						<Text style={{ fontSize: 12 }}>{cityDisplay.name}</Text>
+						<Text
+							type="secondary"
+							style={{ fontSize: 11, display: "block" }}
+						>
+							{parseCitiesLabel}
+						</Text>
+					</Card>
+				</div>
+				{reportRows > 0 && !isPending ? (
+					<>
+						<Divider style={{ margin: "12px 0" }} />
+						<Space
+							style={{ width: "100%", justifyContent: "space-between" }}
+							wrap
+						>
+							<Text strong>Отчёт в памяти</Text>
+							<Button
+								type="primary"
+								icon={<BarChartOutlined />}
+								onClick={() => navigate("/auto-ru/report")}
+							>
+								Аналитика
+							</Button>
+						</Space>
+					</>
+				) : (
+					<Text
+						type="secondary"
+						style={{ fontSize: 12, display: "block", marginTop: 8 }}
+					>
+						Нет загруженного отчёта — после парсинга здесь появится кнопка
+						аналитики.
+					</Text>
+				)}
+			</Card>
+
+			<div className="ms-launch-kpi">
+				<div className="ms-stat-tile ms-launch-kpi-offers">
 					<Statistic
 						title="Всего предложений"
 						value={memSummary.totalOffers || 0}
@@ -402,60 +523,25 @@ export function AutoRu() {
 						{reportRows ? `${reportSheets} бренда · в памяти` : "Нет отчёта"}
 					</div>
 				</div>
-				<div className="ms-stat-tile">
-					<Statistic
-						title="Средняя цена"
-						value={memSummary.avgPrice ? rubCompact(memSummary.avgPrice) : "—"}
-						valueStyle={{ color: "var(--ms-amber)" }}
-					/>
-					<div className="ms-stat-delta ms-stat-delta--muted">
-						По текущему отчёту
+				<div className="ms-launch-info">
+					<div className="ms-launch-info-row">
+						<span className="ms-launch-info-label">Последний запуск</span>
+						<span>{lastStart}</span>
 					</div>
-				</div>
-				<div className="ms-stat-tile">
-					<Statistic
-						title="Мин. цена рынка"
-						value={memSummary.minPrice ? rubCompact(memSummary.minPrice) : "—"}
-						valueStyle={{ color: "var(--ms-green)" }}
-					/>
-					<div className="ms-stat-delta ms-stat-delta--muted">
-						{minPriceLabel}
+					<div className="ms-launch-info-row">
+						<span className="ms-launch-info-label">Длительность</span>
+						<span>{lastDuration}</span>
 					</div>
-				</div>
-				<div className="ms-stat-tile">
-					<Statistic
-						title="Макс. скидка"
-						value={
-							memSummary.maxDiscount
-								? `−${Math.round(memSummary.maxDiscount).toLocaleString("ru-RU")} ₽`
-								: "—"
-						}
-						valueStyle={{ color: "var(--ms-red)" }}
-					/>
-					<div className="ms-stat-delta ms-stat-delta--muted">
-						По витрине в памяти
+					<div className="ms-launch-info-row">
+						<span className="ms-launch-info-label">Отчёт</span>
+						<span style={{ color: REF.acc }}>
+							{reportSheets} бренда · {reportRows} строк
+						</span>
 					</div>
-				</div>
-			</div>
-
-			<div className="ms-launch-info">
-				<div className="ms-launch-info-row">
-					<span className="ms-launch-info-label">Последний запуск</span>
-					<span>{lastStart}</span>
-				</div>
-				<div className="ms-launch-info-row">
-					<span className="ms-launch-info-label">Длительность</span>
-					<span>{lastDuration}</span>
-				</div>
-				<div className="ms-launch-info-row">
-					<span className="ms-launch-info-label">Отчёт</span>
-					<span style={{ color: REF.acc }}>
-						{reportSheets} бренда · {reportRows} строк
-					</span>
-				</div>
-				<div className="ms-launch-info-row">
-					<span className="ms-launch-info-label">Города</span>
-					<span>{parseCitiesLabel}</span>
+					<div className="ms-launch-info-row">
+						<span className="ms-launch-info-label">Города</span>
+						<span>{parseCitiesLabel}</span>
+					</div>
 				</div>
 			</div>
 
@@ -463,12 +549,38 @@ export function AutoRu() {
 				<Card
 					className="ms-dash-card"
 					size="small"
-					title="Динамика минимальных цен"
+					title={
+						<div>
+							<div>Динамика минимальных цен</div>
+							<Text
+								type="secondary"
+								style={{
+									fontSize: 11,
+									fontWeight: 400,
+									display: "block",
+									marginTop: 4,
+									lineHeight: 1.45,
+								}}
+							>
+								По каждому запуску — минимальная цена среди всех предложений в
+								истории; точки могут относиться к разным моделям. Подсказка при
+								наведении на точку.
+							</Text>
+						</div>
+					}
 				>
 					<CockpitMinPriceLine
 						data={lineSeries}
 						height={140}
 					/>
+					{lineLastContext ? (
+						<div
+							className="ms-stat-delta ms-stat-delta--muted"
+							style={{ marginTop: 6 }}
+						>
+							{lineLastContext}
+						</div>
+					) : null}
 					{lineDeltaHint ? (
 						<div
 							className={`ms-stat-delta ${lineSeries[lineSeries.length - 1]?.value >= lineSeries[0]?.value ? "ms-stat-delta--up" : "ms-stat-delta--dn"}`}
@@ -548,85 +660,6 @@ export function AutoRu() {
 				)}
 			</Card>
 
-			<div className="ms-cockpit-g3">
-				<Card
-					className="ms-dash-card"
-					size="small"
-					title="Бренды"
-					extra={
-						<Button
-							type="link"
-							size="small"
-							onClick={() => navigate("/auto-ru/settings")}
-						>
-							Изменить
-						</Button>
-					}
-				>
-					<Text
-						type="secondary"
-						style={{ fontSize: 12 }}
-					>
-						Выбрано {selectedCount} из {totalBrands}
-					</Text>
-					<div className="ms-brand-tags">
-						{(settings.brands || []).slice(0, 14).map((b) => (
-							<Tag
-								key={b.id}
-								className="ms-brand-tag"
-								color={b.selected ? "blue" : "default"}
-							>
-								{b.name}
-							</Tag>
-						))}
-					</div>
-				</Card>
-				<Card
-					className="ms-dash-card"
-					size="small"
-					title="Годы"
-				>
-					<Statistic
-						title="Диапазон"
-						value={yearsText}
-					/>
-				</Card>
-				<Card
-					className="ms-dash-card"
-					size="small"
-					title="Каталог"
-				>
-					<Text style={{ fontSize: 12 }}>{cityDisplay.name}</Text>
-					<Text
-						type="secondary"
-						style={{ fontSize: 11, display: "block" }}
-					>
-						{parseCitiesLabel}
-					</Text>
-				</Card>
-			</div>
-
-			{reportRows > 0 && !isPending ? (
-				<Card
-					className="ms-summary-card"
-					size="small"
-				>
-					<Space
-						style={{ width: "100%", justifyContent: "space-between" }}
-						wrap
-					>
-						<Text strong>Отчёт в памяти</Text>
-						<Button
-							type="primary"
-							icon={<BarChartOutlined />}
-							onClick={() => navigate("/auto-ru/report")}
-						>
-							Аналитика
-						</Button>
-					</Space>
-				</Card>
-			) : null}
-
 			{favoriteSnapshots.length > 0 ? (
 				<Card
 					className="ms-dash-card"
@@ -649,7 +682,19 @@ export function AutoRu() {
 										{f.equipment} • {f.modification} • {f.year}
 									</div>
 									{best ? (
-										<div className="ms-fav-price">{money(best.price)}</div>
+										<>
+											<div className="ms-pr-detail ms-fav-dealer">
+												{best.dealer && String(best.dealer).trim()
+													? best.dealer
+													: "Дилер не указан"}
+												{best.city &&
+												String(best.city).trim() &&
+												String(best.city).trim() !== "—"
+													? ` · ${best.city}`
+													: ""}
+											</div>
+											<div className="ms-fav-price">{money(best.price)}</div>
+										</>
 									) : (
 										<Text
 											type="secondary"

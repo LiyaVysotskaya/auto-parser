@@ -63,15 +63,6 @@ export function Layout() {
 					borderRight: `0.5px solid ${logoBorder}`,
 				}}
 			>
-				<div
-					className="ms-sider-logo"
-					style={{ borderBottomColor: logoBorder }}
-				>
-					<div className="ms-sider-logo-title">
-						Auto<span>.Ru</span>
-					</div>
-					<div className="ms-sider-logo-sub">Мониторинг цен</div>
-				</div>
 				<Menu
 					className="ms-sider-menu"
 					theme={isDark ? "dark" : "light"}

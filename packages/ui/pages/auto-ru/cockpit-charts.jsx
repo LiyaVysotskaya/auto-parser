@@ -18,6 +18,44 @@ import { theme } from "antd"
 
 import { REF } from "../../theme-tokens.js"
 
+function minPriceTooltip({ active, payload, label }, token) {
+	if (!active || !payload?.length) return null
+	const p = payload[0]?.payload || {}
+	const title = [p.brand, p.model].filter(Boolean).join(" ").trim()
+	const loc = [p.dealer, p.city && p.city !== "—" ? p.city : null]
+		.filter(Boolean)
+		.join(" · ")
+	return (
+		<div
+			style={{
+				background: token.colorBgElevated,
+				border: `0.5px solid ${token.colorBorder}`,
+				borderRadius: 6,
+				fontSize: 12,
+				padding: "8px 10px",
+				maxWidth: 280,
+			}}
+		>
+			<div style={{ color: token.colorTextTertiary, fontSize: 11, marginBottom: 4 }}>
+				{label}
+			</div>
+			<div style={{ fontWeight: 600, marginBottom: 4 }}>
+				Мин. цена: {p.value != null ? `${p.value} тыс ₽` : "—"}
+			</div>
+			{title ? (
+				<div style={{ color: token.colorText, marginBottom: 2 }}>{title}</div>
+			) : null}
+			{loc ? (
+				<div style={{ color: token.colorTextSecondary, fontSize: 11 }}>{loc}</div>
+			) : (
+				<div style={{ color: token.colorTextTertiary, fontSize: 11 }}>
+					Нет привязки к дилеру в записи истории
+				</div>
+			)}
+		</div>
+	)
+}
+
 /** Минимальная цена по запускам, тыс. ₽ (ось Y как в HTML-прототипе). */
 export function CockpitMinPriceLine({ data, height = 140 }) {
 	const { token } = theme.useToken()
@@ -59,15 +97,7 @@ export function CockpitMinPriceLine({ data, height = 140 }) {
 						tickFormatter={(v) => `${v}`}
 						width={36}
 					/>
-					<Tooltip
-						contentStyle={{
-							background: token.colorBgElevated,
-							border: `0.5px solid ${token.colorBorder}`,
-							borderRadius: 6,
-							fontSize: 12,
-						}}
-						formatter={(v) => [`${v} тыс ₽`, "Мин. цена"]}
-					/>
+					<Tooltip content={(props) => minPriceTooltip(props, token)} />
 					<Area type="monotone" dataKey="value" stroke="none" fill={fill} fillOpacity={1} />
 					<Line
 						type="monotone"

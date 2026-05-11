@@ -282,6 +282,81 @@ body,
 	margin-bottom: 8px;
 }
 
+.ms-dash-actions-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 10px 14px;
+	width: 100%;
+}
+
+.ms-dash-actions-secondary .ant-btn {
+	border-radius: 10px;
+}
+
+.ms-dash-actions-divider.ant-divider-vertical {
+	height: 40px;
+	margin: 0;
+	top: 0;
+	border-inline-start-color: var(--ant-color-border-secondary);
+}
+
+@media (max-width: 576px) {
+	.ms-dash-actions-divider.ant-divider-vertical {
+		display: none;
+	}
+}
+
+.ms-parser-run-btns .ant-btn {
+	min-width: 112px;
+	font-weight: 600;
+	border-radius: 12px;
+}
+
+.ms-parser-start-btn.ant-btn-primary:not(:disabled) {
+	box-shadow: 0 2px 0 rgba(0, 0, 0, 0.04);
+}
+
+.ms-parser-stop-btn.ant-btn-dangerous.ant-btn-variant-solid:not(:disabled) {
+	box-shadow: 0 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.ms-launch-kpi {
+	display: grid;
+	grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+	gap: 12px;
+	align-items: stretch;
+	margin-bottom: 12px;
+}
+
+.ms-launch-kpi-offers {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+}
+
+@media (max-width: 768px) {
+	.ms-launch-kpi {
+		grid-template-columns: 1fr;
+	}
+}
+
+.ms-launch-kpi .ms-launch-info {
+	margin-bottom: 0;
+	min-height: 100%;
+}
+
+.ms-cockpit-g3--embedded {
+	margin-bottom: 0;
+}
+
+.ms-fav-dealer {
+	margin-top: 4px;
+	font-size: 12px;
+	color: var(--ant-color-text-secondary);
+}
+
 .ms-cockpit-g2 {
 	display: grid;
 	grid-template-columns: 1fr 1fr;

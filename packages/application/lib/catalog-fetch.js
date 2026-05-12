@@ -2,11 +2,6 @@ import * as autoRuTools from "@market-slice/auto-ru"
 
 import { launchBrowser } from "./browser.js"
 
-const GOTO_OPTIONS = Object.freeze({
-	waitUntil: "networkidle2",
-	timeout: 60_000,
-})
-
 export async function fetchCatalogBrands(options, signal) {
 	let browser = null
 	try {

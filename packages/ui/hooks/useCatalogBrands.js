@@ -2,12 +2,11 @@ import { useMemo, useState } from "react"
 
 import { message } from "antd"
 
-import { electron } from "../../../electron.js"
+import { electron } from "../electron.js"
 
-export function useCatalogModels() {
+export function useCatalogBrands() {
 	const [open, setOpen] = useState(false)
 	const [loading, setLoading] = useState(false)
-	const [brandId, setBrandId] = useState("")
 	const [items, setItems] = useState([])
 	const [query, setQuery] = useState("")
 	const [picked, setPicked] = useState(() => new Set())
@@ -26,33 +25,30 @@ export function useCatalogModels() {
 		)
 	}, [items, query])
 
-	const openModal = async (brand) => {
-		const bid = brand?.id
-		if (!bid) return
-		if (!electron?.fetchModelsFromAutoRu) {
-			message.warning("Загрузка моделей доступна только в приложении Electron")
+	const openModal = async () => {
+		if (!electron?.fetchBrandsFromAutoRu) {
+			message.warning("Загрузка каталога доступна только в приложении Electron")
 			return
 		}
-		setBrandId(bid)
 		setOpen(true)
 		setQuery("")
 		setPicked(new Set())
 		setItems([])
 		setLoading(true)
 		try {
-			const res = await electron.fetchModelsFromAutoRu(bid)
+			const res = await electron.fetchBrandsFromAutoRu()
 			const fetched = Array.isArray(res?.items) ? res.items : []
 			setItems(fetched)
 			if (!res?.ok) {
 				message.warning(
 					res?.error
-						? `Не удалось загрузить модели: ${res.error}`
-						: "Не удалось загрузить модели.",
+						? `Не удалось загрузить каталог: ${res.error}. Показан запасной список.`
+						: "Показан запасной список брендов.",
 				)
 			}
 		} catch (e) {
 			console.error(e)
-			message.error("Ошибка загрузки моделей с auto.ru")
+			message.error("Ошибка загрузки брендов с auto.ru")
 		} finally {
 			setLoading(false)
 		}
@@ -72,7 +68,6 @@ export function useCatalogModels() {
 	return {
 		open,
 		loading,
-		brandId,
 		items,
 		filtered,
 		query,

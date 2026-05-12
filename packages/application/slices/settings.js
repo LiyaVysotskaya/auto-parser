@@ -1,5 +1,4 @@
 import { createSlice } from "@reduxjs/toolkit"
-import _ from "lodash"
 
 import { getDefaultSettings } from "../settings/defaults.js"
 
@@ -9,7 +8,7 @@ const initialState = getDefaultSettings()
 
 export const slice = createSlice({
 	name: "settings",
-	initialState: _.cloneDeep(initialState),
+	initialState: structuredClone(initialState),
 	reducers: {
 		updateBrands(state, action) {
 			state.brands = action.payload
@@ -31,7 +30,7 @@ export const slice = createSlice({
 			return { ...state, ...action.payload }
 		},
 		reset() {
-			return _.cloneDeep(initialState)
+			return structuredClone(initialState)
 		},
 	},
 })

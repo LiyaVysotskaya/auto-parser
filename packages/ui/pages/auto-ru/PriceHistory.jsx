@@ -5,7 +5,6 @@ import {
 	DownloadOutlined,
 	UploadOutlined,
 } from "@ant-design/icons"
-import { mergeCityOptions } from "@market-slice/application/settings/defaults.js"
 import {
 	Alert,
 	Button,
@@ -26,8 +25,10 @@ import {
 import dayjs from "dayjs"
 
 import { electron } from "../../electron.js"
+import { useCityLabel } from "../../hooks/useCityLabel.js"
+import { downloadJson } from "../../utils/download-file.js"
 import { attachPriceDeltas, stableOfferKey } from "./offer-delta.js"
-import { money } from "./report-formatters.js"
+import { money } from "@market-slice/application/lib/formatters.js"
 
 const { Paragraph, Text, Title } = Typography
 const { RangePicker } = DatePicker
@@ -95,15 +96,7 @@ export function PriceHistory() {
 	const [tableSearch, setTableSearch] = useState("")
 
 	const settings = useSelector((state) => state.settings)
-	const getCityLabel = useMemo(() => {
-		const opts = mergeCityOptions(settings.extraCities ?? [])
-		const byId = new Map(opts.map((c) => [String(c.id), c.name]))
-		return (id) => {
-			if (id == null || id === "" || id === "—") return "—"
-			const s = String(id)
-			return byId.get(s) ?? s
-		}
-	}, [settings.extraCities])
+	const getCityLabel = useCityLabel()
 	const didAutoCity = useRef(false)
 	const { token } = theme.useToken()
 
@@ -455,17 +448,10 @@ export function PriceHistory() {
 			message.error(res?.error || "Ошибка экспорта")
 			return
 		}
-		const blob = new Blob([JSON.stringify(res.data, null, 2)], {
-			type: "application/json;charset=utf-8",
-		})
-		const url = URL.createObjectURL(blob)
-		const a = document.createElement("a")
-		a.href = url
-		a.download = `price-history_${dayjs().format("DD MM YYYY")}.json`
-		document.body.appendChild(a)
-		a.click()
-		a.remove()
-		URL.revokeObjectURL(url)
+		downloadJson(
+			res.data,
+			`price-history_${dayjs().format("DD MM YYYY")}.json`,
+		)
 		message.success("Экспорт готов")
 	}
 

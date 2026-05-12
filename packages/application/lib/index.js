@@ -5,7 +5,13 @@ export { fetchCatalogBrands, fetchCatalogModels } from "./catalog-fetch.js"
 export { buildLaunchOptions, launchBrowser } from "./browser.js"
 export { saveReport } from "./file-export.js"
 export { runAutoRu } from "./orchestrator.js"
-export { flattenReport } from "./flatten-report.js"
+export * from "./analytics.js"
+export { money, pct } from "./formatters.js"
+export {
+	offerFullKey,
+	offerIdentityKey,
+	offerPositionKey,
+} from "./offer-key.js"
 export {
 	DEFAULT_YEARS,
 	getDefaultBrandCatalog,

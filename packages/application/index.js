@@ -6,7 +6,6 @@ import chalk from "chalk"
 import { program } from "commander"
 import * as dateFns from "date-fns"
 import figlet from "figlet"
-import _ from "lodash"
 import { fileURLToPath } from "url"
 
 import { getConfig } from "./config.js"
@@ -64,8 +63,31 @@ program
 
 program.parse()
 
+function throttle(fn, wait) {
+	let last = 0
+	let timer = null
+	return () => {
+		const now = Date.now()
+		const remaining = wait - (now - last)
+		const run = () => {
+			last = Date.now()
+			timer = null
+			fn()
+		}
+		if (remaining <= 0) {
+			if (timer) {
+				clearTimeout(timer)
+				timer = null
+			}
+			run()
+		} else if (!timer) {
+			timer = setTimeout(run, remaining)
+		}
+	}
+}
+
 render()
-store.subscribe(_.throttle(render, 500))
+store.subscribe(throttle(render, 500))
 
 function render() {
 	const { log, ...state } = store.getState()

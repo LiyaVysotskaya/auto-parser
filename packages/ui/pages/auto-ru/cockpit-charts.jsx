@@ -65,10 +65,6 @@ function runPriceTrendTooltip({ active, payload, label }, token, getCityLabel) {
 	)
 }
 
-/**
- * По запускам: медиана цены по всем строкам (тыс. ₽) и пунктиром — минимум
- * (самая дешёвая позиция в том же запуске).
- */
 export function CockpitMinPriceLine({ data, height = 140, getCityLabel = (x) => x }) {
 	const { token } = theme.useToken()
 	const stroke = REF.acc
@@ -135,7 +131,6 @@ export function CockpitMinPriceLine({ data, height = 140, getCityLabel = (x) => 
 	)
 }
 
-/** Доля предложений по брендам — кольцевая диаграмма как в HTML (cutout ~70%). */
 export function CockpitBrandDonut({ slices, height = 140 }) {
 	const { token } = theme.useToken()
 	const data = useMemo(
@@ -225,7 +220,6 @@ export function CockpitDonutLegend({ slices }) {
 	)
 }
 
-/** Горизонтальные бары по моделям (объём рынка). */
 export function CockpitModelHBar({ rows, height = 180 }) {
 	const { token } = theme.useToken()
 	const grid = token.colorBorderSecondary

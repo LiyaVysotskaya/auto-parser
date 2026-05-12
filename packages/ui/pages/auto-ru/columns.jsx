@@ -2,7 +2,7 @@ import React from "react"
 
 import { Badge, Tag, Tooltip, Typography } from "antd"
 
-import { money, pct } from "./report-formatters.js"
+import { money, pct } from "@market-slice/application/lib/formatters.js"
 
 const { Text } = Typography
 

@@ -1,8 +1,11 @@
-import _ from "lodash"
-
-const safeGet = (obj, path, defaultValue = "") => {
-	const value = _.get(obj, path, defaultValue)
-	return value === null || value === undefined ? defaultValue : value
+function getByPath(obj, path, defaultValue = "") {
+	if (obj == null) return defaultValue
+	let cur = obj
+	for (const key of path.split(".")) {
+		if (cur == null || typeof cur !== "object") return defaultValue
+		cur = cur[key]
+	}
+	return cur == null ? defaultValue : cur
 }
 
 function rowGroupKey(groupKey) {
@@ -36,7 +39,7 @@ export class ReportBuilder {
 	add(offer) {
 		if (!offer) return
 
-		const mark = safeGet(offer, "vehicle_info.mark_info.name", "Unknown")
+		const mark = getByPath(offer, "vehicle_info.mark_info.name", "Unknown")
 
 		let tab = this._tabsByName.get(mark)
 		if (!tab) {
@@ -45,11 +48,11 @@ export class ReportBuilder {
 		}
 
 		const groupKey = {
-			model: safeGet(offer, "vehicle_info.model_info.name", ""),
-			equipment: safeGet(offer, "vehicle_info.complectation.name", ""),
-			modification: safeGet(offer, "vehicle_info.tech_param.human_name", ""),
-			year: safeGet(offer, "documents.year", 0),
-			dealer: safeGet(offer, "salon.name", ""),
+			model: getByPath(offer, "vehicle_info.model_info.name", ""),
+			equipment: getByPath(offer, "vehicle_info.complectation.name", ""),
+			modification: getByPath(offer, "vehicle_info.tech_param.human_name", ""),
+			year: getByPath(offer, "documents.year", 0),
+			dealer: getByPath(offer, "salon.name", ""),
 			city: this._city || "—",
 		}
 
@@ -76,7 +79,7 @@ export class ReportBuilder {
 		}
 
 		row.count++
-		const price = Number(safeGet(offer, "price_info.price", Infinity))
+		const price = Number(getByPath(offer, "price_info.price", Infinity))
 
 		if (price < row.price) {
 			row.price = price
@@ -87,7 +90,7 @@ export class ReportBuilder {
 		}
 
 		const maxDiscount = Number(
-			safeGet(offer, "discount_options.max_discount", 0),
+			getByPath(offer, "discount_options.max_discount", 0),
 		)
 		const priceMin = price - maxDiscount
 
@@ -95,13 +98,13 @@ export class ReportBuilder {
 			row.priceMin = priceMin
 			row.maxDiscount = maxDiscount
 			row.tradeInDiscount = Number(
-				safeGet(offer, "discount_options.tradein", null),
+				getByPath(offer, "discount_options.tradein", null),
 			)
 			row.creditDiscount = Number(
-				safeGet(offer, "discount_options.credit", null),
+				getByPath(offer, "discount_options.credit", null),
 			)
 			row.insuranceDiscount = Number(
-				safeGet(offer, "discount_options.insurance", null),
+				getByPath(offer, "discount_options.insurance", null),
 			)
 		}
 	}

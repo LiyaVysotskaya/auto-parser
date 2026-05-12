@@ -1,6 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react"
-import { useSelector } from "react-redux"
-import { mergeCityOptions } from "@market-slice/application/settings/defaults.js"
 
 import {
 	Button,
@@ -20,8 +18,10 @@ import {
 	compareDealers,
 	filterRowsFlatByCity,
 	flattenReport,
-} from "../../analytics.js"
-import { money, pct } from "./report-formatters.js"
+} from "@market-slice/application/lib/analytics.js"
+import { money, pct } from "@market-slice/application/lib/formatters.js"
+
+import { useCityLabel } from "../../hooks/useCityLabel.js"
 
 const { Text, Paragraph } = Typography
 
@@ -44,7 +44,7 @@ function uniqueSorted(rowsFlat, key) {
 }
 
 export function DealerComparison({ report = [], forcedCity = null }) {
-	const settings = useSelector((state) => state.settings)
+	const getCityLabel = useCityLabel()
 	const { rowsFlat: rawFlat } = useMemo(() => flattenReport(report), [report])
 	const rowsFlat = useMemo(
 		() => filterRowsFlatByCity(rawFlat, forcedCity),
@@ -53,15 +53,6 @@ export function DealerComparison({ report = [], forcedCity = null }) {
 	const dealers = useMemo(() => uniqueDealers(rowsFlat), [rowsFlat])
 	const allBrands = useMemo(() => uniqueSorted(rowsFlat, "brand"), [rowsFlat])
 	const allCities = useMemo(() => uniqueSorted(rowsFlat, "city"), [rowsFlat])
-	const getCityLabel = useMemo(() => {
-		const opts = mergeCityOptions(settings.extraCities ?? [])
-		const byId = new Map(opts.map((c) => [String(c.id), c.name]))
-		return (id) => {
-			if (id == null || id === "" || id === "—") return "—"
-			const s = String(id)
-			return byId.get(s) ?? s
-		}
-	}, [settings.extraCities])
 
 	const [baseDealer, setBaseDealer] = useState(null)
 	const [otherDealers, setOtherDealers] = useState([])
@@ -268,7 +259,7 @@ export function DealerComparison({ report = [], forcedCity = null }) {
 				render: (v) => pct(v),
 			},
 		],
-		[modelFilters],
+		[modelFilters, getCityLabel],
 	)
 
 	if (!dealers.length) {

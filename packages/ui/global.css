@@ -1111,3 +1111,80 @@ body,
 	max-height: 120px;
 	overflow-y: auto;
 }
+
+.ms-width-full {
+	width: 100%;
+}
+
+.ms-mb-0 {
+	margin-bottom: 0;
+}
+
+.ms-mt-6 {
+	margin-top: 6px;
+}
+
+.ms-nav-label-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	width: 100%;
+	gap: 8px;
+}
+
+.ms-competitors-hint {
+	font-size: 13px;
+}
+
+.ms-price-trend-subtitle {
+	display: block;
+	font-size: 12px;
+	margin-top: 2px;
+}
+
+.ms-parse-config-link {
+	font-size: 12px;
+}
+
+.ms-text-12 {
+	font-size: 12px;
+}
+
+.ms-text-11 {
+	font-size: 11px;
+}
+
+.ms-launch-info-accent {
+	font-weight: 600;
+	color: var(--ant-color-text);
+}
+
+.ms-price-moves-hint {
+	margin-left: 8px;
+	font-size: 12px;
+	font-weight: 400;
+}
+
+.ms-run-log-empty {
+	opacity: 0.65;
+}
+
+.ms-hidden-input {
+	position: absolute;
+	width: 0;
+	height: 0;
+	opacity: 0;
+	overflow: hidden;
+}
+
+.ms-error-boundary-msg {
+	margin: 8px 0;
+	font-family: var(--ms-font-mono);
+	font-size: 12px;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.ms-chip-spaced {
+	margin-right: 4px;
+}

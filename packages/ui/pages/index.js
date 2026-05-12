@@ -8,7 +8,6 @@ import {
 	TableOutlined,
 } from "@ant-design/icons"
 import { instance as reduxStore } from "@market-slice/application/store"
-import _ from "lodash"
 
 import { Layout } from "../layout.js"
 import { Competitors } from "./auto-ru/Competitors.jsx"
@@ -33,15 +32,7 @@ function reportRowsBadgeCount() {
 function reportMenuLabel() {
 	const n = reportRowsBadgeCount()
 	return (
-		<span
-			style={{
-				display: "flex",
-				alignItems: "center",
-				justifyContent: "space-between",
-				width: "100%",
-				gap: 8,
-			}}
-		>
+		<span className="ms-nav-label-row">
 			<span>Отчёт</span>
 			{n > 0 ? (
 				<span className="ms-nav-badge">
@@ -100,16 +91,24 @@ export const defaultRoutes = ["/auto-ru", "/auto-ru/index"]
 
 export const initialEntries = defaultRoutes
 
+function pick(obj, keys) {
+	const out = {}
+	for (const k of keys) {
+		if (Object.prototype.hasOwnProperty.call(obj, k)) out[k] = obj[k]
+	}
+	return out
+}
+
 export function routes(current = pages) {
-	if (_.isArray(current)) return current.map((route) => routes(route))
+	if (Array.isArray(current)) return current.map((route) => routes(route))
 	return {
-		..._.pick(current, ["Component", "element", "path"]),
+		...pick(current, ["Component", "element", "path"]),
 		...(current.children && { children: routes(current.children) }),
 	}
 }
 
 export function menu(current = pages, parent) {
-	if (_.isArray(current))
+	if (Array.isArray(current))
 		return current
 			.map((route) => menu(route, parent))
 			.flat()
@@ -120,7 +119,7 @@ export function menu(current = pages, parent) {
 	if (current.hidden) return null
 	return {
 		key,
-		..._.pick(current, ["icon", "label", "disabled"]),
+		...pick(current, ["icon", "label", "disabled"]),
 		...(current.children && {
 			children: menu(current.children, {
 				...current,
@@ -130,7 +129,6 @@ export function menu(current = pages, parent) {
 	}
 }
 
-/** Хлебные крошки по дереву меню — без дублирования «Главная / Главная». */
 export function breadcrumbItemsFromPath(pathname) {
 	function walk(items, path) {
 		for (const it of items || []) {

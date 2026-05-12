@@ -34,16 +34,15 @@ import {
 	Typography,
 	message,
 } from "antd"
-import _ from "lodash"
 
 import { electron } from "../../electron.js"
+import { downloadBlob } from "../../utils/download-file.js"
 import { BrandSettings } from "./BrandSettings.jsx"
 import { CitySettings } from "./CitySettings.jsx"
 import { YearsSettings } from "./YearsSettings.jsx"
 
 const { Paragraph, Text, Title } = Typography
 
-/** Снимок полей, которые уходят в файл / localStorage (как в handleSave). */
 function buildPersistPayload(settingsState) {
 	return {
 		brands: settingsState.brands,
@@ -56,12 +55,6 @@ function buildPersistPayload(settingsState) {
 	}
 }
 
-/**
- * Последний успешно сохранённый снимок (живёт между заходами на страницу
- * настроек). null до первой инициализации на странице «Настройки».
- */
-let persistedSettingsBaseline = null
-
 export function Settings() {
 	const dispatch = useDispatch()
 	const store = useStore()
@@ -69,18 +62,22 @@ export function Settings() {
 	const [loading, setLoading] = useState(false)
 	const [leaveSaveLoading, setLeaveSaveLoading] = useState(false)
 	const fileInputRef = useRef(null)
+	const persistedBaselineRef = useRef(null)
 
 	useLayoutEffect(() => {
-		if (persistedSettingsBaseline === null) {
-			persistedSettingsBaseline = _.cloneDeep(
+		if (persistedBaselineRef.current === null) {
+			persistedBaselineRef.current = structuredClone(
 				buildPersistPayload(store.getState().settings),
 			)
 		}
 	}, [store])
 
 	const dirty = useMemo(() => {
-		if (persistedSettingsBaseline === null) return false
-		return !_.isEqual(buildPersistPayload(settings), persistedSettingsBaseline)
+		if (persistedBaselineRef.current === null) return false
+		return (
+			JSON.stringify(buildPersistPayload(settings)) !==
+			JSON.stringify(persistedBaselineRef.current)
+		)
 	}, [settings])
 
 	useEffect(() => {
@@ -106,7 +103,7 @@ export function Settings() {
 				if (ok) {
 					message.success("Настройки успешно сохранены!")
 					dispatch(setSettings(payload))
-					persistedSettingsBaseline = _.cloneDeep(payload)
+					persistedBaselineRef.current = structuredClone(payload)
 					return true
 				}
 				message.error("Ошибка при сохранении настроек")
@@ -114,7 +111,7 @@ export function Settings() {
 			}
 			localStorage.setItem("autoRuSettings", JSON.stringify(payload))
 			dispatch(setSettings(payload))
-			persistedSettingsBaseline = _.cloneDeep(payload)
+			persistedBaselineRef.current = structuredClone(payload)
 			message.success("Настройки сохранены в localStorage (fallback)")
 			return true
 		} catch (error) {
@@ -153,17 +150,12 @@ export function Settings() {
 		try {
 			const payload = buildPersistPayload(settings)
 			const data = JSON.stringify(payload, null, 2)
-			const blob = new Blob([data], {
-				type: "application/json;charset=utf-8",
-			})
-			const url = URL.createObjectURL(blob)
-			const a = document.createElement("a")
-			a.href = url
-			a.download = "auto-ru-settings.json"
-			document.body.appendChild(a)
-			a.click()
-			a.remove()
-			URL.revokeObjectURL(url)
+			downloadBlob(
+				new Blob([data], {
+					type: "application/json;charset=utf-8",
+				}),
+				"auto-ru-settings.json",
+			)
 			message.success("Экспорт подготовлен")
 		} catch (err) {
 			console.error("export err", err)

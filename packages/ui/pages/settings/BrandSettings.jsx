@@ -30,8 +30,8 @@ import {
 	message,
 } from "antd"
 
-import { useCatalogBrands } from "./hooks/useCatalogBrands.js"
-import { useCatalogModels } from "./hooks/useCatalogModels.js"
+import { useCatalogBrands } from "../../hooks/useCatalogBrands.js"
+import { useCatalogModels } from "../../hooks/useCatalogModels.js"
 
 const { Search } = Input
 const { Title, Text } = Typography
@@ -434,7 +434,6 @@ export function BrandSettings() {
 				}}
 			/>
 
-			{/* Brand edit/add modal */}
 			<Modal
 				title={editingBrand ? "Редактирование бренда" : "Добавить бренд"}
 				open={isModalOpen}
@@ -468,7 +467,6 @@ export function BrandSettings() {
 				</Space>
 			</Modal>
 
-			{/* Catalog brands modal */}
 			<Modal
 				title="Бренды с auto.ru"
 				open={catalogBrands.open}
@@ -524,7 +522,6 @@ export function BrandSettings() {
 				</Space>
 			</Modal>
 
-			{/* Catalog models modal */}
 			<Modal
 				title={`Модели: ${catalogModels.brandId}`}
 				open={catalogModels.open}

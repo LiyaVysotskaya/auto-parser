@@ -4,7 +4,10 @@
 	"bin": "./index.js",
 	"exports": {
 		".": "./lib/index.js",
+		"./lib/analytics.js": "./lib/analytics.js",
 		"./lib/flatten-report.js": "./lib/flatten-report.js",
+		"./lib/formatters.js": "./lib/formatters.js",
+		"./lib/offer-key.js": "./lib/offer-key.js",
 		"./settings": "./settings/index.js",
 		"./settings/*": "./settings/*",
 		"./store": "./store.js",
@@ -26,7 +29,6 @@
 		"date-fns": "^3.6.0",
 		"dotenv": "^16.4.5",
 		"figlet": "^1.7.0",
-		"lodash": "^4.17.21",
 		"xlsx": "^0.18.5"
 	},
 	"devDependencies": {

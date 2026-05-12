@@ -1,5 +1,4 @@
 import { createSlice } from "@reduxjs/toolkit"
-import _ from "lodash"
 
 const initialState = {
 	count: 0,
@@ -17,7 +16,7 @@ const initialState = {
 
 export const slice = createSlice({
 	name: "autoRu",
-	initialState: _.cloneDeep(initialState),
+	initialState: structuredClone(initialState),
 	reducers: {
 		offer(state, action) {
 			const payload = action.payload
@@ -40,7 +39,7 @@ export const slice = createSlice({
 			state.lastRun = { ...state.lastRun, ...action.payload }
 		},
 		reset() {
-			return _.cloneDeep(initialState)
+			return structuredClone(initialState)
 		},
 	},
 })

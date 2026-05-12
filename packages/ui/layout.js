@@ -22,8 +22,10 @@ import {
 } from "antd"
 import * as dateFns from "date-fns"
 
+import { ErrorBoundary } from "./ErrorBoundary.jsx"
 import { breadcrumbItemsFromPath, defaultRoutes, menu } from "./pages/index.js"
 import { useTheme } from "./theme-context.js"
+import { downloadBlob } from "./utils/download-file.js"
 
 const { Content, Sider, Header } = AntdLayout
 
@@ -135,23 +137,20 @@ export function Layout() {
 						overflow: "initial",
 					}}
 				>
-					<Outlet />
+					<ErrorBoundary title="Ошибка в разделе">
+						<Outlet />
+					</ErrorBoundary>
 					<FloatButton
 						tooltip="Скачать лог"
 						icon={<BugOutlined />}
 						onClick={() => {
-							const a = document.createElement("a")
-							const href = (a.href = URL.createObjectURL(
+							downloadBlob(
 								new Blob(
 									[logs.map((record) => JSON.stringify(record)).join("\n")],
 									{ type: "text/plain" },
 								),
-							))
-							a.download = `${dateFns.format(new Date(), "dd MM yyyy HH mm")}.log`
-							document.body.appendChild(a)
-							a.click()
-							document.body.removeChild(a)
-							URL.revokeObjectURL(href)
+								`${dateFns.format(new Date(), "dd MM yyyy HH mm")}.log`,
+							)
 						}}
 					/>
 				</Content>

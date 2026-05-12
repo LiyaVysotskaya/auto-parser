@@ -26,31 +26,41 @@ function loadSettings() {
 	}
 }
 
-const settings = loadSettings()
-const listingUrl =
-	process.env.AUTO_RU_LISTING_URL ??
-	`https://auto.ru/${settings.city}/cars/new/?output_type=list`
+let cachedConfig = null
 
-const config = {
-	autoRu: {
-		browser: {
-			executablePath: process.env.CHROME_EXECUTABLE_PATH ?? chromePaths.chrome,
+function buildConfig() {
+	const settings = loadSettings()
+	const listingUrl =
+		process.env.AUTO_RU_LISTING_URL ??
+		`https://auto.ru/${settings.city}/cars/new/?output_type=list`
+	return {
+		autoRu: {
+			browser: {
+				executablePath:
+					process.env.CHROME_EXECUTABLE_PATH ?? chromePaths.chrome,
+			},
+			url: listingUrl,
+			city: settings.city,
+			cities: settings.cities,
+			brands: settings.brands,
+			years: settings.years,
 		},
-		url: listingUrl,
-		city: settings.city,
-		cities: settings.cities,
-		brands: settings.brands,
-		years: settings.years,
-	},
+	}
 }
 
 export function getConfig() {
-	return config
+	if (!cachedConfig) cachedConfig = buildConfig()
+	return cachedConfig
+}
+
+export function resetApplicationConfigCache() {
+	cachedConfig = null
 }
 
 export function saveSettings(newSettings) {
 	try {
 		saveSettingsSync(settingsPath, newSettings)
+		resetApplicationConfigCache()
 		return true
 	} catch (error) {
 		console.error("Ошибка сохранения настроек:", error)

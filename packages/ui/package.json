@@ -35,7 +35,6 @@
 	"dependencies": {
 		"date-fns": "^3.6.0",
 		"dayjs": "^1.11.13",
-		"lodash": "^4.17.21",
 		"normalize.css": "^8.0.1",
 		"react-router-dom": "^6.25.1",
 		"recharts": "^3.8.1"

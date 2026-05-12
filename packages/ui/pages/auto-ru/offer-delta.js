@@ -1,24 +1,13 @@
-/**
- * Стабильный ключ позиции и расчёт Δ цены между запусками (история цен,
- * дашборд).
- */
+import { offerFullKey } from "@market-slice/application/lib/offer-key.js"
 
 export function stableOfferKey(r) {
-	return [
-		r.brand,
-		r.model,
-		r.equipment || "—",
-		r.modification || "—",
-		String(r.year ?? ""),
-		r.dealer || "—",
-		r.city || "—",
-	].join("\u0000")
+	return offerFullKey(r)
 }
 
 export function attachPriceDeltas(rows) {
 	const byKey = new Map()
 	for (const r of rows) {
-		const k = stableOfferKey(r)
+		const k = offerFullKey(r)
 		if (!byKey.has(k)) byKey.set(k, [])
 		byKey.get(k).push(r)
 	}

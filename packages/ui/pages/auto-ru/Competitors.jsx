@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useMemo } from "react"
 import { useSelector } from "react-redux"
 
-import { mergeCityOptions } from "@market-slice/application/settings/defaults.js"
 import { Alert, Card, Select, Space, Typography } from "antd"
 
 import {
@@ -9,9 +8,8 @@ import {
 	filterRowsFlatByCity,
 	flattenReport,
 	generateComprehensiveAnalytics,
-	resolveReportCityScope,
-	uniqueCitiesFromReport,
-} from "../../analytics.js"
+} from "@market-slice/application/lib/analytics.js"
+import { useReportCityScope } from "../../hooks/useReportCityScope.js"
 import { CockpitModelHBar } from "./cockpit-charts.jsx"
 import { DealerComparison } from "./DealerComparison.jsx"
 
@@ -19,29 +17,12 @@ const { Text } = Typography
 
 export function Competitors() {
 	const report = useSelector((state) => state.autoRu.report || [])
-	const settings = useSelector((state) => state.settings)
-
-	const cityIds = useMemo(() => uniqueCitiesFromReport(report), [report])
-	const cityOptions = useMemo(() => {
-		const opts = mergeCityOptions(settings.extraCities ?? [])
-		return cityIds.map((id) => ({
-			value: id,
-			label: opts.find((c) => c.id === id)?.name || id,
-		}))
-	}, [cityIds, settings.extraCities])
-
-	const [cityOverride, setCityOverride] = useState(null)
-
-	useEffect(() => {
-		const ids = uniqueCitiesFromReport(report)
-		setCityOverride((prev) => (prev && ids.includes(prev) ? prev : null))
-	}, [report])
-
-	const effectiveScopeCity = useMemo(() => {
-		if (!cityIds.length) return null
-		if (cityOverride && cityIds.includes(cityOverride)) return cityOverride
-		return resolveReportCityScope(report, settings) ?? cityIds[0]
-	}, [report, settings, cityOverride, cityIds])
+	const {
+		cityIds,
+		cityOptions,
+		effectiveScopeCity,
+		setCityOverride,
+	} = useReportCityScope(report)
 
 	const analytics = useMemo(
 		() => generateComprehensiveAnalytics(report, { city: effectiveScopeCity }),
@@ -80,12 +61,19 @@ export function Competitors() {
 
 	if (!report.length) {
 		return (
-			<Text type="secondary">Загрузите отчёт на главной или дождитесь сбора — здесь появятся дилеры и сравнение цен.</Text>
+			<Text type="secondary">
+				Загрузите отчёт на главной или дождитесь сбора — здесь появятся дилеры и
+				сравнение цен.
+			</Text>
 		)
 	}
 
 	return (
-		<Space direction="vertical" style={{ width: "100%" }} size={14}>
+		<Space
+			direction="vertical"
+			className="ms-width-full"
+			size={14}
+		>
 			{cityIds.length > 1 ? (
 				<Space wrap align="center">
 					<Text strong>Город:</Text>
@@ -102,52 +90,82 @@ export function Competitors() {
 					type="info"
 					showIcon
 					message="Статистика только для выбранного города — как в макете отчёта."
-					style={{ marginBottom: 0 }}
+					className="ms-mb-0"
 				/>
 			) : null}
 
-			<Text type="secondary" style={{ fontSize: 11, display: "block" }}>
-				Объём предложений по дилерам — нажмите на строку в таблице сравнения ниже, чтобы задать базу в блоке «Сравнение».
+			<Text
+				type="secondary"
+				className="ms-competitors-hint"
+			>
+				Объём предложений по дилерам — нажмите на строку в таблице сравнения ниже,
+				чтобы задать базу в блоке «Сравнение».
 			</Text>
 
 			{brandCards.map(({ brand, topFive, maxUnits, modelBarRows, brandRows }) => (
-				<div key={brand} className="ms-cockpit-g2">
-					<Card className="ms-dash-card" size="small" title={`Топ дилеров — ${brand}`}>
+				<div
+					key={brand}
+					className="ms-cockpit-g2"
+				>
+					<Card
+						className="ms-dash-card"
+						size="small"
+						title={`Топ дилеров — ${brand}`}
+					>
 						{topFive.map((d, idx) => {
 							const full = d.dealer || "—"
 							const n = d.units ?? d.count ?? 0
 							const pct = Math.round((n / maxUnits) * 100)
-							const models = dealerModelBreakdown(brandRows, full, 4).map((x) => x.model)
+							const models = dealerModelBreakdown(brandRows, full, 4).map(
+								(x) => x.model,
+							)
 							return (
-								<div key={full} className="ms-comp-row">
-									<div style={{ fontSize: 10, color: "var(--ant-color-text-quaternary)", width: 14 }}>
-										{idx + 1}
-									</div>
-									<div style={{ flex: 1, minWidth: 0 }}>
+								<div
+									key={full}
+									className="ms-comp-row"
+								>
+									<div className="ms-comp-rank">{idx + 1}</div>
+									<div className="ms-comp-main">
 										<div className="ms-comp-name">{full}</div>
-										<div style={{ marginTop: 2 }}>
+										<div className="ms-comp-models">
 											{models.map((m) => (
-												<span key={m} className="ms-chip ms-chip-blue" style={{ marginRight: 4 }}>
+												<span
+													key={m}
+													className="ms-chip ms-chip-blue ms-chip-spaced"
+												>
 													{m}
 												</span>
 											))}
 										</div>
 									</div>
 									<div className="ms-bar-bg">
-										<div className="ms-bar-fill" style={{ width: `${pct}%` }} />
+										<div
+											className="ms-bar-fill"
+											style={{ width: `${pct}%` }}
+										/>
 									</div>
 									<div className="ms-comp-cnt">{n}</div>
 								</div>
 							)
 						})}
 					</Card>
-					<Card className="ms-dash-card" size="small" title={`Распределение по моделям — ${brand}`}>
-						<CockpitModelHBar rows={modelBarRows} height={200} />
+					<Card
+						className="ms-dash-card"
+						size="small"
+						title={`Распределение по моделям — ${brand}`}
+					>
+						<CockpitModelHBar
+							rows={modelBarRows}
+							height={200}
+						/>
 					</Card>
 				</div>
 			))}
 
-			<DealerComparison report={report} forcedCity={effectiveScopeCity} />
+			<DealerComparison
+				report={report}
+				forcedCity={effectiveScopeCity}
+			/>
 		</Space>
 	)
 }

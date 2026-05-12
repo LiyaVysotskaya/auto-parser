@@ -6,24 +6,15 @@ import {
 	addFavorite,
 	removeFavorite,
 } from "@market-slice/application/slices/favorites.js"
+import { offerIdentityKey } from "@market-slice/application/lib/offer-key.js"
 import { Button, Tooltip } from "antd"
 
 import { electron } from "../../electron.js"
 
-function rowKey(r) {
-	return [
-		r.brand,
-		r.model,
-		r.equipment ?? "—",
-		r.modification ?? "—",
-		String(r.year ?? "—"),
-	].join("\u0000")
-}
-
 export function FavoriteStar({ row }) {
 	const dispatch = useDispatch()
 	const items = useSelector((s) => s.favorites.items)
-	const active = items.some((x) => rowKey(x) === rowKey(row))
+	const active = items.some((x) => offerIdentityKey(x) === offerIdentityKey(row))
 
 	const toggle = async () => {
 		const payload = {

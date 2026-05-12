@@ -1,8 +1,3 @@
-/**
- * Тема приложения: тёмный «кокпит» по ref (auto_ru_full_app.html) и светлый
- * вариант с единой сеткой отступов, теней и нейтральным фоном макета.
- */
-
 export const REF = Object.freeze({
 	bg0: "#0d0f14",
 	bg1: "#111318",
@@ -21,14 +16,12 @@ export const REF = Object.freeze({
 	blueSoft: "#85B7EB",
 })
 
-/** Ant Design theme config for ConfigProvider */
 export function buildAntdTheme(isDark) {
 	if (isDark) {
 		return {
 			token: {
 				colorPrimary: REF.acc,
 				colorInfo: REF.acc,
-				/* Приглушённые семантические — меньше «радуги» в таблицах и тегах */
 				colorSuccess: "#6B9E86",
 				colorWarning: "#B89A6A",
 				colorError: "#C17B6E",
@@ -177,7 +170,6 @@ export function buildAntdTheme(isDark) {
 	}
 }
 
-/** Statistic / semantic accents (use with theme.useToken() where needed) */
 export function statValueColors(isDark) {
 	if (!isDark) {
 		return {
@@ -199,10 +191,6 @@ export function statValueColors(isDark) {
 	}
 }
 
-/**
- * Спокойная палитра линий/столбцов Recharts (в т.ч. тёмная — в одной холодной
- * гамме).
- */
 export function chartSeriesColors(isDark) {
 	if (isDark) {
 		return [

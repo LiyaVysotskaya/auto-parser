@@ -1,10 +1,8 @@
-import { flattenReport as flattenReportFromApp } from "../application/lib/flatten-report.js"
+import { flattenReport } from "./flatten-report.js"
+import { offerFullKey, offerPositionKey } from "./offer-key.js"
 
-export function flattenReport(report = []) {
-	return flattenReportFromApp(report)
-}
+export { flattenReport }
 
-/** City ids present in report (excludes placeholder "—"). */
 export function uniqueCitiesFromReport(report = []) {
 	const { rowsFlat } = flattenReport(report)
 	const s = new Set()
@@ -18,10 +16,6 @@ export function uniqueCitiesFromReport(report = []) {
 	return [...s].sort((a, b) => a.localeCompare(b, "ru"))
 }
 
-/**
- * Pick default city for analytics: single city in data, else settings.city if
- * listed, else first settings.cities hit, else first in report.
- */
 export function resolveReportCityScope(report = [], settings = {}) {
 	const cities = uniqueCitiesFromReport(report)
 	if (cities.length === 0) return null
@@ -57,7 +51,6 @@ function buildDealerCounts(rowsFlat) {
 	return dealerCounts
 }
 
-/** Rows under one dealer: model lines with unit counts (for drill-down UI). */
 export function dealerModelBreakdown(rowsFlat, dealerName, limit = 80) {
 	const d = String(dealerName || "").trim()
 	if (!d) return []
@@ -291,17 +284,6 @@ export function computePerBrandAnalytics(report = [], opts = {}) {
 	return out
 }
 
-function positionKey(offer) {
-	return [
-		offer.brand,
-		offer.model,
-		offer.equipment,
-		offer.modification,
-		String(offer.year ?? ""),
-		String(offer.city ?? "—"),
-	].join("\u0000")
-}
-
 export function compareDealers(rowsFlat, baseDealer, otherDealers = []) {
 	const base = String(baseDealer || "").trim()
 	const others = [
@@ -320,7 +302,7 @@ export function compareDealers(rowsFlat, baseDealer, otherDealers = []) {
 
 	const byPos = new Map()
 	for (const r of rowsFlat) {
-		const key = positionKey(r)
+		const key = offerPositionKey(r)
 		if (!byPos.has(key)) byPos.set(key, {})
 		byPos.get(key)[r.dealer] = r
 	}
@@ -348,7 +330,7 @@ export function compareDealers(rowsFlat, baseDealer, otherDealers = []) {
 			diffSum += diffAbs
 			pairCount++
 			rows.push({
-				key: `${positionKey(baseRow)}::${od}`,
+				key: `${offerPositionKey(baseRow)}::${od}`,
 				brand: baseRow.brand,
 				model: baseRow.model,
 				equipment: baseRow.equipment,
@@ -431,18 +413,6 @@ export function generateComprehensiveAnalytics(report = [], opts = {}) {
 	}
 }
 
-export function offerHistoryKey(o) {
-	return [
-		o.brand,
-		o.model,
-		o.equipment || "—",
-		o.modification || "—",
-		String(o.year ?? ""),
-		o.dealer || "—",
-		o.city || "—",
-	].join("\u0000")
-}
-
 function pickOfferSummary(o) {
 	return {
 		brand: o.brand,
@@ -455,12 +425,11 @@ function pickOfferSummary(o) {
 	}
 }
 
-/** Сравнение двух плоских списков предложений (например из двух XLSX). */
 export function diffFlattenedOffers(rowsA, rowsB) {
 	const mapA = new Map()
-	for (const row of rowsA) mapA.set(offerHistoryKey(row), row)
+	for (const row of rowsA) mapA.set(offerFullKey(row), row)
 	const mapB = new Map()
-	for (const row of rowsB) mapB.set(offerHistoryKey(row), row)
+	for (const row of rowsB) mapB.set(offerFullKey(row), row)
 	const rows = []
 	const keys = new Set([...mapA.keys(), ...mapB.keys()])
 	for (const k of keys) {

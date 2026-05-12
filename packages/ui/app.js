@@ -54,7 +54,6 @@ function AppInner() {
 		}
 	}, [dispatch])
 
-	/* Светлая тема без compact — крупнее типографика и удобнее для «рабочего» дашборда */
 	const algorithms = isDark
 		? [theme.darkAlgorithm, theme.compactAlgorithm]
 		: [theme.defaultAlgorithm]

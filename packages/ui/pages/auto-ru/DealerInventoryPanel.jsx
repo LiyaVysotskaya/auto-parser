@@ -11,8 +11,8 @@ import {
 } from "recharts"
 import { Card, Drawer, List, Space, Table, Typography } from "antd"
 
-import { dealerModelBreakdown } from "../../analytics.js"
-import { money } from "./report-formatters.js"
+import { dealerModelBreakdown } from "@market-slice/application/lib/analytics.js"
+import { money } from "@market-slice/application/lib/formatters.js"
 
 const { Text } = Typography
 

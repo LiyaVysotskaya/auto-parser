@@ -1,17 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { useSelector } from "react-redux"
 
+import { generateComprehensiveAnalytics } from "@market-slice/application/lib/analytics.js"
+import { money } from "@market-slice/application/lib/formatters.js"
 import { mergeCityOptions } from "@market-slice/application/settings/defaults.js"
 import { Input, Select, Space, Table, Tag, Tooltip, Typography } from "antd"
 
-import {
-	generateComprehensiveAnalytics,
-	resolveReportCityScope,
-	uniqueCitiesFromReport,
-} from "../../analytics.js"
+import { useCityLabel } from "../../hooks/useCityLabel.js"
+import { useReportCityScope } from "../../hooks/useReportCityScope.js"
 import { FavoriteStar } from "./FavoriteStar.jsx"
 import { buildDetailedColumns } from "./columns.jsx"
-import { money } from "./report-formatters.js"
 
 const { Text } = Typography
 
@@ -301,39 +299,11 @@ function BrandCockpitPanel({ brand, data, modelRows, getCityLabel }) {
 
 export function AutoRuReport() {
 	const report = useSelector((state) => state.autoRu.report || [])
-	const settings = useSelector((state) => state.settings)
-	const cityIds = useMemo(() => uniqueCitiesFromReport(report), [report])
-	const cityOptions = useMemo(() => {
-		const opts = mergeCityOptions(settings.extraCities ?? [])
-		return cityIds.map((id) => ({
-			value: id,
-			label: opts.find((c) => c.id === id)?.name || id,
-		}))
-	}, [cityIds, settings.extraCities])
+	const getCityLabel = useCityLabel()
+	const { cityIds, cityOptions, effectiveScopeCity, setCityOverride } =
+		useReportCityScope(report)
 
-	const getCityLabel = useMemo(() => {
-		const opts = mergeCityOptions(settings.extraCities ?? [])
-		const byId = new Map(opts.map((c) => [String(c.id), c.name]))
-		return (id) => {
-			if (id == null || id === "" || id === "—") return "—"
-			const s = String(id)
-			return byId.get(s) ?? s
-		}
-	}, [settings.extraCities])
-
-	const [cityOverride, setCityOverride] = useState(null)
 	const [brandTab, setBrandTab] = useState(null)
-
-	useEffect(() => {
-		const ids = uniqueCitiesFromReport(report)
-		setCityOverride((prev) => (prev && ids.includes(prev) ? prev : null))
-	}, [report])
-
-	const effectiveScopeCity = useMemo(() => {
-		if (!cityIds.length) return null
-		if (cityOverride && cityIds.includes(cityOverride)) return cityOverride
-		return resolveReportCityScope(report, settings) ?? cityIds[0]
-	}, [report, settings, cityOverride, cityIds])
 
 	const analytics = useMemo(
 		() => generateComprehensiveAnalytics(report, { city: effectiveScopeCity }),

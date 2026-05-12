@@ -328,7 +328,7 @@ body,
 	padding: 14px 16px 16px;
 }
 
-/* Журнал: компактные строки вместо «стены» Alert */
+/* Журнал */
 .ms-log-list.ant-list-split .ant-list-item {
 	border-block-end-color: var(--ant-color-border-secondary);
 	padding: 10px 12px;
@@ -375,7 +375,7 @@ body,
 	padding-inline-start: 4px;
 }
 
-/* Таблицы: чуть плотнее заголовок, понятнее строки */
+/* Таблицы */
 .ant-table-wrapper.ms-table-polished .ant-table-thead > tr > th {
 	font-weight: 600;
 	font-size: 12px;
@@ -387,7 +387,7 @@ body,
 	font-size: 13px;
 }
 
-/* Меню: акцент слева как в референсе */
+/* Меню */
 .ant-menu.ms-sider-menu.ant-menu-root.ant-menu-inline .ant-menu-item,
 .ant-menu.ms-sider-menu.ant-menu-root.ant-menu-inline .ant-menu-submenu-title {
 	margin-block: 4px;
@@ -397,7 +397,7 @@ body,
 	font-weight: 600;
 }
 
-/* Область графиков — как «карта» в ref HTML: ровная рамка, без лишнего шума */
+/* Область графиков */
 .ms-chart-surface {
 	padding: 14px 16px 10px;
 	border-radius: var(--ant-border-radius-lg, 12px);
@@ -415,7 +415,7 @@ body,
 	padding: 10px 12px 8px;
 }
 
-/* История цен: фильтры и широкая таблица */
+/* История цен: фильтры и таблица */
 .ms-price-history-page .ms-price-history-filters .ms-ph-range {
 	width: 100%;
 }
@@ -470,7 +470,7 @@ body,
 	letter-spacing: 0.01em;
 }
 
-/* Колонка «Изм. цены» — акцент */
+/* Колонка «Изм. цены» */
 .ms-price-history-table th.ms-ph-delta-col,
 .ms-price-history-table td.ms-ph-delta-col {
 	background: var(--ant-color-success-bg, rgba(82, 196, 26, 0.12)) !important;
@@ -548,7 +548,7 @@ body,
 	white-space: nowrap;
 }
 
-/* —— Макет «кокпит» (auto_ru_full_app.html) —— */
+/* —— Макет «кокпит» */
 .ms-dash-actions {
 	margin-bottom: 8px;
 }
@@ -650,7 +650,7 @@ body,
 	}
 }
 
-/* Единый формат блока «Настройки парсинга» на главной Auto.ru */
+/* Блок «Настройки парсинга» на главной */
 .ms-parse-config-grid {
 	display: grid;
 	grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr) minmax(0, 1fr);
@@ -880,7 +880,7 @@ body,
 	flex-shrink: 0;
 }
 
-/* Таблица как в HTML: компактный thead */
+/* Таблица компактный thead */
 .ant-table-wrapper.ms-table-polished .ant-table-thead > tr > th {
 	font-size: 10px;
 	font-weight: 500;
@@ -891,7 +891,7 @@ body,
 	font-size: 12px;
 }
 
-/* Чипы / строки конкурентов (если ещё не заданы выше в сборке) */
+/* Чипы / строки конкурентов */
 .ms-chip {
 	display: inline-block;
 	padding: 1px 6px;

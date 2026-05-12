@@ -7,6 +7,9 @@ import { normalizeStoredSettings } from "@market-slice/application/settings/norm
 import { setFavorites } from "@market-slice/application/slices/favorites.js"
 import { setSettings } from "@market-slice/application/slices/settings.js"
 import { App as AntdApp, ConfigProvider, theme } from "antd"
+import ruRU from "antd/es/locale/ru_RU.js"
+import dayjs from "dayjs"
+import "dayjs/locale/ru.js"
 import "normalize.css"
 
 import { electron } from "./electron.js"
@@ -14,6 +17,10 @@ import "./global.css"
 import { initialEntries, routes } from "./pages/index.js"
 import { ThemeProvider, useTheme } from "./theme-context.js"
 import { buildAntdTheme } from "./theme-tokens.js"
+
+dayjs.locale("ru")
+
+const antdLocale = ruRU?.default ?? ruRU
 
 const router = createMemoryRouter(routes(), {
 	initialEntries,
@@ -55,6 +62,7 @@ function AppInner() {
 
 	return (
 		<ConfigProvider
+			locale={antdLocale}
 			theme={{
 				algorithm: algorithms,
 				token: tk.token,

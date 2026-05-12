@@ -1,12 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { useDispatch, useSelector } from "react-redux"
 
-import {
-	CheckCircleFilled,
-	DeleteOutlined,
-	PlusOutlined,
-	SearchOutlined,
-} from "@ant-design/icons"
+import { DeleteOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons"
 import {
 	DEFAULT_CITY_ID,
 	isKnownCityId,
@@ -19,7 +14,6 @@ import {
 	Card,
 	Checkbox,
 	Col,
-	Divider,
 	Input,
 	List,
 	Modal,
@@ -115,11 +109,13 @@ export function CitySettings() {
 		const extra = (settings.extraCities ?? []).filter(
 			(c) => c.id !== cityEntry.id,
 		)
-		const nextCity =
-			settings.city === cityEntry.id ? DEFAULT_CITY_ID : settings.city
 		const cities = (settings.cities ?? []).filter((id) => id !== cityEntry.id)
 		const nextCities =
-			cities.length > 0 ? cities : [nextCity].filter(Boolean)
+			cities.length > 0 ? cities : [DEFAULT_CITY_ID]
+		const nextCity =
+			settings.city === cityEntry.id
+				? (nextCities[0] ?? DEFAULT_CITY_ID)
+				: settings.city
 		dispatch(
 			setSettings({
 				...settings,
@@ -131,36 +127,51 @@ export function CitySettings() {
 		message.success("Город удалён")
 	}
 
-	const handleSelectCity = (cityId) => {
-		const cur = settings.cities ?? [settings.city]
-		const nextCities = cur.includes(cityId) ? cur : [...cur, cityId]
-		dispatch(
-			setSettings({
-				...settings,
-				city: cityId,
-				cities: nextCities.length ? nextCities : [cityId],
-			}),
-		)
-	}
-
 	const parseCityValues = settings.cities?.length
 		? settings.cities
 		: [settings.city]
 
-	const onParseCitiesChange = (ids) => {
-		if (!ids.length) {
+	const extraCityIds = useMemo(
+		() => new Set((settings.extraCities ?? []).map((c) => c.id)),
+		[settings.extraCities],
+	)
+
+	const inParseCount = parseCityValues.length
+
+	const applyParseCities = (nextCities) => {
+		if (!nextCities.length) {
 			message.warning("Нужен хотя бы один город для парсинга")
 			return
 		}
-		dispatch(setSettings({ ...settings, cities: ids }))
+		const uniq = [...new Set(nextCities.map((id) => String(id).trim()))].filter(
+			Boolean,
+		)
+		if (!uniq.length) {
+			message.warning("Нужен хотя бы один город для парсинга")
+			return
+		}
+		const nextCity = uniq.includes(settings.city) ? settings.city : uniq[0]
+		dispatch(setSettings({ ...settings, cities: uniq, city: nextCity }))
+	}
+
+	const toggleCityInParse = (cityId, checked) => {
+		const cur = settings.cities?.length ? [...settings.cities] : [settings.city]
+		const next = checked
+			? [...new Set([...cur, cityId])]
+			: cur.filter((id) => id !== cityId)
+		applyParseCities(next)
 	}
 
 	return (
 		<Space direction="vertical" style={{ width: "100%" }} size="middle">
-			<Title level={5}>Город для парсинга</Title>
+			<Title level={5}>
+				Города для парсинга ({inParseCount} из {cityOptions.length} в очереди)
+			</Title>
 			<Text type="secondary">
-				Выберите город, откуда будут собираться предложения. Активный город
-				подсвечен. Можно добавлять свои регионы auto.ru по slug из URL.
+				Отметьте регионы для сбора — парсинг пройдёт по каждому по очереди. Если
+				основной город снят с парсинга, первым в очереди станет следующий из
+				списка. Свои регионы auto.ru добавляйте по slug из URL; в отчёте и
+				истории у строк будет колонка «Город».
 			</Text>
 
 			<Row gutter={12} style={{ alignItems: "center" }}>
@@ -184,28 +195,101 @@ export function CitySettings() {
 				</Col>
 			</Row>
 
-			<Divider style={{ margin: "12px 0" }} />
-
-			<Title level={5}>Города для парсинга</Title>
-			<Text type="secondary" style={{ display: "block", marginBottom: 8 }}>
-				Отметьте один или несколько регионов — сбор пройдёт по каждому по
-				очереди. В отчёте и истории у строк будет колонка «Город».
-			</Text>
-			<Checkbox.Group
-				style={{ width: "100%" }}
-				value={parseCityValues}
-				onChange={onParseCitiesChange}
-			>
-				<Row gutter={[8, 8]}>
-					{cityOptions.map((c) => (
-						<Col key={c.id}>
-							<Checkbox value={c.id}>{c.name}</Checkbox>
-						</Col>
-					))}
-				</Row>
-			</Checkbox.Group>
-
-			<Divider style={{ margin: "12px 0" }} />
+			<List
+				grid={{ gutter: 8, column: 4 }}
+				dataSource={filteredCities}
+				locale={{ emptyText: "Нет городов по запросу" }}
+				renderItem={(c) => {
+					const inParse = parseCityValues.includes(c.id)
+					const isExtra = extraCityIds.has(c.id)
+					return (
+						<List.Item style={{ padding: 0, margin: 0, borderBottom: "none" }}>
+							<Card
+								size="small"
+								bordered
+								styles={{
+									body: {
+										padding: 8,
+										display: "flex",
+										flexDirection: "column",
+										gap: 6,
+										minHeight: 48,
+									},
+								}}
+								style={{
+									border: inParse
+										? "2px solid var(--ant-color-primary)"
+										: "1px solid #d9d9d9",
+									margin: 4,
+									boxSizing: "border-box",
+									boxShadow: inParse
+										? "0 0 0 2px rgba(22, 119, 255, 0.1)"
+										: "0 1px 2px rgba(0, 0, 0, 0.06)",
+								}}
+							>
+								<div
+									style={{
+										display: "flex",
+										alignItems: "flex-start",
+										justifyContent: "space-between",
+										gap: 8,
+									}}
+								>
+									<div style={{ flex: 1, minWidth: 0 }}>
+										<div
+											style={{
+												display: "flex",
+												alignItems: "center",
+												gap: 8,
+											}}
+										>
+											<Checkbox
+												checked={inParse}
+												onChange={(e) =>
+													toggleCityInParse(c.id, e.target.checked)
+												}
+												style={{ margin: 0, padding: 0 }}
+											/>
+											<strong>{c.name}</strong>
+										</div>
+										<Text
+											type="secondary"
+											style={{ fontSize: 12, display: "block", marginTop: 4 }}
+										>
+											{c.id}
+										</Text>
+									</div>
+									{isExtra ? (
+										<div
+											style={{
+												display: "flex",
+												alignItems: "center",
+												gap: 6,
+												flexShrink: 0,
+											}}
+										>
+											<Popconfirm
+												title={`Удалить город «${c.name}» из списка и из сохранённых регионов?`}
+												onConfirm={() => handleRemoveExtraCity(c)}
+												okText="Да"
+												cancelText="Нет"
+											>
+												<Tooltip title="Удалить регион">
+													<Button
+														size="small"
+														danger
+														icon={<DeleteOutlined />}
+													/>
+												</Tooltip>
+											</Popconfirm>
+										</div>
+									) : null}
+								</div>
+							</Card>
+						</List.Item>
+					)
+				}}
+			/>
 
 			<Modal
 				title="Добавить город"

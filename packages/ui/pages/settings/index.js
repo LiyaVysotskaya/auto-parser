@@ -1,5 +1,12 @@
-import React, { useRef, useState } from "react"
-import { useDispatch, useSelector } from "react-redux"
+import React, {
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react"
+import { useDispatch, useSelector, useStore } from "react-redux"
+import { useBlocker } from "react-router-dom"
 
 import {
 	CalendarOutlined,
@@ -17,7 +24,17 @@ import {
 	reset,
 	setSettings,
 } from "@market-slice/application/slices/settings.js"
-import { Button, Card, Modal, Space, Tabs, Typography, message } from "antd"
+import {
+	Alert,
+	Button,
+	Card,
+	Modal,
+	Space,
+	Tabs,
+	Typography,
+	message,
+} from "antd"
+import _ from "lodash"
 
 import { electron } from "../../electron.js"
 import { BrandSettings } from "./BrandSettings.jsx"
@@ -26,40 +43,104 @@ import { YearsSettings } from "./YearsSettings.jsx"
 
 const { Paragraph, Text, Title } = Typography
 
+/** Снимок полей, которые уходят в файл / localStorage (как в handleSave). */
+function buildPersistPayload(settingsState) {
+	return {
+		brands: settingsState.brands,
+		years: settingsState.years,
+		city: settingsState.city,
+		cities: settingsState.cities?.length
+			? settingsState.cities
+			: [settingsState.city],
+		extraCities: settingsState.extraCities ?? [],
+	}
+}
+
+/**
+ * Последний успешно сохранённый снимок (живёт между заходами на страницу
+ * настроек). null до первой инициализации на странице «Настройки».
+ */
+let persistedSettingsBaseline = null
+
 export function Settings() {
 	const dispatch = useDispatch()
+	const store = useStore()
 	const settings = useSelector((state) => state.settings)
 	const [loading, setLoading] = useState(false)
+	const [leaveSaveLoading, setLeaveSaveLoading] = useState(false)
 	const fileInputRef = useRef(null)
 
-	const handleSave = async () => {
-		setLoading(true)
+	useLayoutEffect(() => {
+		if (persistedSettingsBaseline === null) {
+			persistedSettingsBaseline = _.cloneDeep(
+				buildPersistPayload(store.getState().settings),
+			)
+		}
+	}, [store])
+
+	const dirty = useMemo(() => {
+		if (persistedSettingsBaseline === null) return false
+		return !_.isEqual(buildPersistPayload(settings), persistedSettingsBaseline)
+	}, [settings])
+
+	useEffect(() => {
+		if (!dirty) return
+		const onBeforeUnload = (e) => {
+			e.preventDefault()
+			e.returnValue = ""
+		}
+		window.addEventListener("beforeunload", onBeforeUnload)
+		return () => window.removeEventListener("beforeunload", onBeforeUnload)
+	}, [dirty])
+
+	const blocker = useBlocker(
+		({ currentLocation, nextLocation }) =>
+			dirty && currentLocation.pathname !== nextLocation.pathname,
+	)
+
+	const persistToDisk = async (sourceSettings) => {
+		const payload = buildPersistPayload(sourceSettings)
 		try {
-			const payload = {
-				brands: settings.brands,
-				years: settings.years,
-				city: settings.city,
-				cities: settings.cities?.length ? settings.cities : [settings.city],
-				extraCities: settings.extraCities ?? [],
-			}
 			if (electron?.saveSettings) {
 				const ok = await electron.saveSettings(payload)
 				if (ok) {
 					message.success("Настройки успешно сохранены!")
 					dispatch(setSettings(payload))
-				} else {
-					message.error("Ошибка при сохранении настроек")
+					persistedSettingsBaseline = _.cloneDeep(payload)
+					return true
 				}
-			} else {
-				localStorage.setItem("autoRuSettings", JSON.stringify(payload))
-				dispatch(setSettings(payload))
-				message.success("Настройки сохранены в localStorage (fallback)")
+				message.error("Ошибка при сохранении настроек")
+				return false
 			}
+			localStorage.setItem("autoRuSettings", JSON.stringify(payload))
+			dispatch(setSettings(payload))
+			persistedSettingsBaseline = _.cloneDeep(payload)
+			message.success("Настройки сохранены в localStorage (fallback)")
+			return true
 		} catch (error) {
 			console.error("Ошибка сохранения:", error)
 			message.error("Ошибка при сохранении настроек")
+			return false
+		}
+	}
+
+	const handleSave = async () => {
+		setLoading(true)
+		try {
+			await persistToDisk(settings)
 		} finally {
 			setLoading(false)
+		}
+	}
+
+	const handleSaveFromBlocker = async () => {
+		setLeaveSaveLoading(true)
+		try {
+			const latest = store.getState().settings
+			const ok = await persistToDisk(latest)
+			if (ok) blocker.proceed?.()
+		} finally {
+			setLeaveSaveLoading(false)
 		}
 	}
 
@@ -70,13 +151,7 @@ export function Settings() {
 
 	const handleExport = () => {
 		try {
-			const payload = {
-				brands: settings.brands,
-				years: settings.years,
-				city: settings.city,
-				cities: settings.cities?.length ? settings.cities : [settings.city],
-				extraCities: settings.extraCities ?? [],
-			}
+			const payload = buildPersistPayload(settings)
 			const data = JSON.stringify(payload, null, 2)
 			const blob = new Blob([data], {
 				type: "application/json;charset=utf-8",
@@ -169,16 +244,12 @@ export function Settings() {
 					style={{ marginBottom: 0 }}
 				>
 					Город и годы задают срез для парсинга; бренды и модели ограничивают
-					объём сбора. После изменений нажмите «Применить и сохранить».
+					объём сбора. Изменения сначала попадают в интерфейс; чтобы записать их
+					в файл приложения, нажмите «Применить и сохранить». При несохранённых
+					изменениях переход на другую страницу или закрытие окна запросит
+					подтверждение.
 				</Paragraph>
 			</div>
-
-			<Card className="ms-summary-card">
-				<Tabs
-					items={tabItems}
-					defaultActiveKey="city"
-				/>
-			</Card>
 
 			<Card
 				className="ms-toolbar-card"
@@ -190,10 +261,18 @@ export function Settings() {
 					style={{ width: "100%" }}
 					size="middle"
 				>
+					{dirty ? (
+						<Alert
+							type="warning"
+							showIcon
+							message="Есть несохранённые изменения"
+							description="Они видны в форме, но ещё не записаны на диск. Нажмите «Применить и сохранить», иначе после перезапуска приложения останутся прежние значения."
+						/>
+					) : null}
 					<Text type="secondary">
-						Сначала настройте вкладки выше, затем сохраните. Экспорт и импорт
-						переносят JSON между машинами; очистка истории не затрагивает
-						избранное.
+						Ниже настройте вкладки с городом, годами и брендами, затем
+						сохраните. Экспорт и импорт переносят JSON между машинами; очистка
+						истории не затрагивает избранное.
 					</Text>
 					<Space
 						wrap
@@ -287,6 +366,49 @@ export function Settings() {
 					</Space>
 				</Space>
 			</Card>
+
+			<Card className="ms-summary-card">
+				<Tabs
+					items={tabItems}
+					defaultActiveKey="city"
+				/>
+			</Card>
+
+			<Modal
+				title="Несохранённые изменения настроек"
+				open={blocker.state === "blocked"}
+				onCancel={() => blocker.reset?.()}
+				footer={[
+					<Button
+						key="stay"
+						onClick={() => blocker.reset?.()}
+					>
+						Остаться
+					</Button>,
+					<Button
+						key="leave"
+						onClick={() => blocker.proceed?.()}
+					>
+						Уйти без сохранения
+					</Button>,
+					<Button
+						key="save"
+						type="primary"
+						loading={leaveSaveLoading}
+						onClick={handleSaveFromBlocker}
+					>
+						Сохранить и перейти
+					</Button>,
+				]}
+				maskClosable={false}
+				closable={false}
+			>
+				<Text type="secondary">
+					Текущие правки не записаны в файл. Сохраните их, останьтесь на этой
+					странице или уйдите — тогда в интерфейсе останутся несохранённые
+					значения до следующего запуска приложения.
+				</Text>
+			</Modal>
 		</Space>
 	)
 }

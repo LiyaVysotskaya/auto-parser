@@ -7,18 +7,6 @@ import {
 } from "@ant-design/icons"
 import { mergeCityOptions } from "@market-slice/application/settings/defaults.js"
 import {
-	Bar,
-	BarChart,
-	CartesianGrid,
-	Legend,
-	Line,
-	LineChart,
-	ResponsiveContainer,
-	Tooltip as RechartsTooltip,
-	XAxis,
-	YAxis,
-} from "recharts"
-import {
 	Alert,
 	Button,
 	Card,
@@ -27,7 +15,6 @@ import {
 	Input,
 	Row,
 	Select,
-	Segmented,
 	Space,
 	Table,
 	Tooltip,
@@ -39,15 +26,11 @@ import {
 import dayjs from "dayjs"
 
 import { electron } from "../../electron.js"
-import { useTheme } from "../../theme-context.js"
-import { chartSeriesColors } from "../../theme-tokens.js"
 import { attachPriceDeltas, stableOfferKey } from "./offer-delta.js"
 import { money } from "./report-formatters.js"
 
 const { Paragraph, Text, Title } = Typography
 const { RangePicker } = DatePicker
-
-const FALLBACK_CHART_PALETTE = ["#64748b", "#475569", "#334155"]
 
 function rowSearchHaystack(r) {
 	return [
@@ -69,96 +52,26 @@ function unitsForRow(r) {
 	return Number.isFinite(c) && c > 0 ? c : 1
 }
 
-function minPriceOnDate(rows, datePrefix, pred) {
-	let m = Infinity
-	for (const r of rows) {
-		if (r.price == null) continue
-		const d = String(r.run_started || "").slice(0, 10)
-		if (d !== datePrefix) continue
-		if (pred && !pred(r)) continue
-		if (r.price < m) m = r.price
-	}
-	return m === Infinity ? null : m
+function normCell(v) {
+	const s = String(v ?? "").trim()
+	return s || "—"
 }
 
-function countOnDate(rows, datePrefix, pred) {
-	let n = 0
-	for (const r of rows) {
-		const d = String(r.run_started || "").slice(0, 10)
-		if (d !== datePrefix) continue
-		if (pred && !pred(r)) continue
-		n++
+function uniqueSortedDistinct(values, locale = "ru") {
+	const seen = new Set()
+	for (const v of values) {
+		seen.add(normCell(v))
 	}
-	return n
+	const out = [...seen]
+	out.sort((a, b) => a.localeCompare(b, locale))
+	return out
 }
 
-function buildChartPack(rows, lineMode, metric, topN, palette) {
-	const pal =
-		Array.isArray(palette) && palette.length > 0 ? palette : FALLBACK_CHART_PALETTE
-	const dates = [
-		...new Set(rows.map((r) => String(r.run_started || "").slice(0, 10))),
-	]
-		.filter(Boolean)
-		.sort((a, b) => a.localeCompare(b))
-	if (!dates.length) return { data: [], series: [], metric }
-
-	if (lineMode === "overall") {
-		const data = dates.map((date) => {
-			if (metric === "count") {
-				return { date, v0: countOnDate(rows, date, null) }
-			}
-			return { date, v0: minPriceOnDate(rows, date, null) }
-		})
-		return {
-			data,
-			series: [
-				{
-					key: "v0",
-					label: metric === "count" ? "Предложений" : "Мин. цена",
-					color: pal[0],
-				},
-			],
-			metric,
-		}
-	}
-
-	const scoreMap = new Map()
-	for (const r of rows) {
-		if (metric === "price" && r.price == null) continue
-		const label =
-			lineMode === "dealer"
-				? String(r.dealer || "—")
-				: String(r.brand || "—")
-		scoreMap.set(label, (scoreMap.get(label) || 0) + 1)
-	}
-	const topLabels = [...scoreMap.entries()]
-		.sort((a, b) => b[1] - a[1])
-		.slice(0, topN)
-		.map(([k]) => k)
-
-	const series = topLabels.map((label, i) => ({
-		key: `v${i}`,
-		label,
-		color: pal[i % pal.length],
-		pred:
-			lineMode === "dealer"
-				? (row) => String(row.dealer || "—") === label
-				: (row) => String(row.brand || "—") === label,
+function stringFilters(list) {
+	return list.map((v) => ({
+		text: v.length > 44 ? `${v.slice(0, 42)}…` : v,
+		value: v,
 	}))
-
-	const data = dates.map((date) => {
-		const row = { date }
-		for (const s of series) {
-			if (metric === "count") {
-				row[s.key] = countOnDate(rows, date, s.pred)
-			} else {
-				row[s.key] = minPriceOnDate(rows, date, s.pred)
-			}
-		}
-		return row
-	})
-
-	return { data, series, metric }
 }
 
 export function PriceHistory() {
@@ -179,15 +92,7 @@ export function PriceHistory() {
 	const [rows, setRows] = useState([])
 	const [loading, setLoading] = useState(false)
 
-	const [tableView, setTableView] = useState("flat")
 	const [tableSearch, setTableSearch] = useState("")
-	const [chartMetric, setChartMetric] = useState("price")
-
-	const chartLineMode = useMemo(() => {
-		if (tableView === "dealer") return "dealer"
-		if (tableView === "brand") return "brand"
-		return "overall"
-	}, [tableView])
 
 	const settings = useSelector((state) => state.settings)
 	const getCityLabel = useMemo(() => {
@@ -201,19 +106,17 @@ export function PriceHistory() {
 	}, [settings.extraCities])
 	const didAutoCity = useRef(false)
 	const { token } = theme.useToken()
-	const { isDark } = useTheme()
-	const chartPalette = useMemo(() => chartSeriesColors(isDark), [isDark])
 
 	const dateFrom =
 		range?.[0] &&
-		typeof range[0].isValid === "function" &&
-		range[0].isValid()
+			typeof range[0].isValid === "function" &&
+			range[0].isValid()
 			? range[0].startOf("day").format("YYYY-MM-DD[T]HH:mm:ss")
 			: undefined
 	const dateTo =
 		range?.[1] &&
-		typeof range[1].isValid === "function" &&
-		range[1].isValid()
+			typeof range[1].isValid === "function" &&
+			range[1].isValid()
 			? range[1].endOf("day").format("YYYY-MM-DD[T]HH:mm:ss")
 			: undefined
 
@@ -270,59 +173,38 @@ export function PriceHistory() {
 		return list
 	}, [rows, tableSearch])
 
-	const groupedHistoryParents = useMemo(() => {
-		if (tableView === "flat") return null
-		const map = new Map()
-		for (const r of filteredHistoryRows) {
-			const gkey =
-				tableView === "dealer"
-					? String(r.dealer || "—")
-					: String(r.brand || "—")
-			if (!map.has(gkey)) {
-				map.set(gkey, {
-					key: gkey,
-					groupTitle: gkey,
-					nestedRows: [],
-				})
-			}
-			map.get(gkey).nestedRows.push(r)
-		}
-		const out = []
-		for (const g of map.values()) {
-			const ch = g.nestedRows
-			const priced = ch.map((x) => x.price).filter((p) => p != null)
-			const minP = priced.length ? Math.min(...priced) : null
-			const maxP = priced.length ? Math.max(...priced) : null
-			out.push({
-				...g,
-				childCount: ch.length,
-				minP,
-				maxP,
-			})
-		}
-		out.sort((a, b) => b.childCount - a.childCount)
-		return out
-	}, [filteredHistoryRows, tableView])
+	const tableColumns = useMemo(() => {
+		const src = rows
+		const brandFilters = stringFilters(
+			uniqueSortedDistinct(src.map((r) => r.brand)),
+		)
+		const modelFilters = stringFilters(
+			uniqueSortedDistinct(src.map((r) => r.model)),
+		)
+		const equipmentFilters = stringFilters(
+			uniqueSortedDistinct(src.map((r) => r.equipment)),
+		)
+		const modificationFilters = stringFilters(
+			uniqueSortedDistinct(src.map((r) => r.modification)),
+		)
+		const yearFilters = uniqueSortedDistinct(
+			src.map((r) => (r.year != null && r.year !== "" ? String(r.year) : "—")),
+		).map((y) => ({ text: y, value: y }))
+		const cityIds = uniqueSortedDistinct(src.map((r) => r.city))
+		const cityFilters = cityIds.map((c) => ({
+			text: getCityLabel(c),
+			value: c,
+		}))
+		const dealerFilters = stringFilters(
+			uniqueSortedDistinct(src.map((r) => r.dealer)),
+		)
 
-	const chartPack = useMemo(
-		() =>
-			buildChartPack(
-				filteredHistoryRows,
-				chartLineMode,
-				chartMetric,
-				10,
-				chartPalette,
-			),
-		[chartLineMode, chartMetric, chartPalette, filteredHistoryRows],
-	)
-
-	const tableColumns = useMemo(
-		() => [
+		return [
 			{
 				title: "Запуск",
 				dataIndex: "run_started",
 				key: "run_started",
-				width: "14%",
+				width: 152,
 				ellipsis: true,
 				sorter: (a, b) =>
 					String(a.run_started || "").localeCompare(String(b.run_started || "")),
@@ -332,24 +214,72 @@ export function PriceHistory() {
 				title: "Бренд",
 				dataIndex: "brand",
 				key: "brand",
-				width: "11%",
+				width: 88,
 				ellipsis: true,
+				filterSearch: true,
+				filters: brandFilters,
+				onFilter: (value, record) => normCell(record.brand) === value,
 				sorter: (a, b) => String(a.brand || "").localeCompare(String(b.brand || ""), "ru"),
+			},
+			{
+				title: "Модель",
+				dataIndex: "model",
+				key: "model",
+				width: 72,
+				ellipsis: true,
+				filterSearch: true,
+				filters: modelFilters,
+				onFilter: (value, record) => normCell(record.model) === value,
+				sorter: (a, b) =>
+					String(a.model || "").localeCompare(String(b.model || ""), "ru"),
 			},
 			{
 				title: "Комплектация",
 				dataIndex: "equipment",
 				key: "equipment",
+				width: 120,
 				ellipsis: true,
+				filterSearch: true,
+				filters: equipmentFilters,
+				onFilter: (value, record) => normCell(record.equipment) === value,
 				sorter: (a, b) =>
 					String(a.equipment || "").localeCompare(String(b.equipment || ""), "ru"),
+			},
+			{
+				title: "Модификация",
+				dataIndex: "modification",
+				key: "modification",
+				width: 200,
+				ellipsis: true,
+				filterSearch: true,
+				filters: modificationFilters,
+				onFilter: (value, record) => normCell(record.modification) === value,
+				sorter: (a, b) =>
+					String(a.modification || "").localeCompare(String(b.modification || ""), "ru"),
+			},
+			{
+				title: "Год",
+				dataIndex: "year",
+				key: "year",
+				width: 64,
+				align: "center",
+				filters: yearFilters,
+				onFilter: (value, record) =>
+					(record.year != null && record.year !== ""
+						? String(record.year)
+						: "—") === value,
+				sorter: (a, b) => Number(a.year ?? 0) - Number(b.year ?? 0),
+				render: (v) => (v != null && v !== "" ? String(v) : "—"),
 			},
 			{
 				title: "Город",
 				dataIndex: "city",
 				key: "city",
-				width: "10%",
+				width: 120,
 				ellipsis: true,
+				filterSearch: true,
+				filters: cityFilters,
+				onFilter: (value, record) => normCell(record.city) === value,
 				sorter: (a, b) => String(a.city || "").localeCompare(String(b.city || ""), "ru"),
 				render: (v) => getCityLabel(v),
 			},
@@ -357,8 +287,11 @@ export function PriceHistory() {
 				title: "Дилер",
 				dataIndex: "dealer",
 				key: "dealer",
-				width: "18%",
+				width: 200,
 				ellipsis: true,
+				filterSearch: true,
+				filters: dealerFilters,
+				onFilter: (value, record) => normCell(record.dealer) === value,
 				sorter: (a, b) =>
 					String(a.dealer || "").localeCompare(String(b.dealer || ""), "ru"),
 			},
@@ -366,7 +299,7 @@ export function PriceHistory() {
 				title: "Шт.",
 				dataIndex: "count",
 				key: "count",
-				width: "6%",
+				width: 56,
 				align: "right",
 				sorter: (a, b) => unitsForRow(a) - unitsForRow(b),
 				render: (_, r) => unitsForRow(r),
@@ -375,17 +308,37 @@ export function PriceHistory() {
 				title: "Цена",
 				dataIndex: "price",
 				key: "price",
-				width: "10%",
+				width: 118,
 				align: "right",
 				sorter: (a, b) => (a.price ?? 0) - (b.price ?? 0),
 				render: (v) => money(v),
 			},
 			{
-				title: "Изм.",
+				title: (
+					<span
+						className="ms-ph-delta-th"
+						title="Изменение основной цены к предыдущему запуску той же позиции"
+					>
+						Изм. цены
+					</span>
+				),
 				key: "delta",
 				className: "ms-ph-delta-col",
-				width: 128,
+				width: 168,
 				align: "right",
+				filters: [
+					{ text: "Снижение", value: "down" },
+					{ text: "Рост", value: "up" },
+					{ text: "Нет сравнения с прошлым запуском", value: "na" },
+				],
+				onFilter: (value, record) => {
+					if (value === "down")
+						return record._delta != null && record._delta < 0
+					if (value === "up")
+						return record._delta != null && record._delta > 0
+					if (value === "na") return record._delta == null
+					return true
+				},
 				sorter: (a, b) => (a._delta ?? 0) - (b._delta ?? 0),
 				render: (_, r) => {
 					if (r._delta == null) return "—"
@@ -401,75 +354,99 @@ export function PriceHistory() {
 					const amount = money(r._delta)
 					const pct =
 						r._deltaPct != null ? `${(r._deltaPct * 100).toFixed(1)}%` : null
-					const tip = pct ? `${arrow}${sign}${amount} (${pct})` : `${arrow}${sign}${amount}`
+					const line = pct
+						? `${arrow}${sign}${amount} (${pct})`
+						: `${arrow}${sign}${amount}`
 					return (
-						<Tooltip title={tip}>
-							<div className="ms-ph-delta-cell">
+						<Tooltip title={line} placement="top">
+							<div className="ms-ph-delta-cell ms-ph-delta-cell--pill">
 								<Text
 									strong
 									style={{
 										color,
 										fontVariantNumeric: "tabular-nums",
-										display: "block",
-										lineHeight: 1.25,
+										whiteSpace: "nowrap",
 									}}
 								>
 									{arrow}
 									{sign}
 									{amount}
+									{pct != null ? (
+										<span
+											style={{
+												color,
+												fontSize: 11,
+												marginLeft: 4,
+												fontWeight: 600,
+												fontVariantNumeric: "tabular-nums",
+												opacity: 0.88,
+											}}
+										>
+											({pct})
+										</span>
+									) : null}
 								</Text>
-								{pct != null ? (
-									<Text
-										style={{
-											color,
-											fontSize: 11,
-											display: "block",
-											lineHeight: 1.2,
-											opacity: 0.92,
-										}}
-									>
-										({pct})
-									</Text>
-								) : null}
 							</div>
 						</Tooltip>
 					)
 				},
 			},
-		],
-		[getCityLabel, token.colorError, token.colorSuccess, token.colorTextSecondary],
-	)
-
-	const groupParentColumns = useMemo(
-		() => [
-			{
-				title: tableView === "dealer" ? "Дилер" : "Бренд",
-				dataIndex: "groupTitle",
-				key: "groupTitle",
-				ellipsis: true,
-				render: (t) => <Text strong>{t}</Text>,
-			},
-			{
-				title: "Строк",
-				dataIndex: "childCount",
-				key: "childCount",
-				width: 90,
-			},
 			{
 				title: "Мин. цена",
-				key: "minP",
-				width: 120,
-				render: (_, r) => money(r.minP),
+				dataIndex: "price_min",
+				key: "price_min",
+				width: 118,
+				align: "right",
+				sorter: (a, b) => (a.price_min ?? 0) - (b.price_min ?? 0),
+				render: (v) => money(v),
 			},
 			{
-				title: "Макс. цена",
-				key: "maxP",
-				width: 120,
-				render: (_, r) => money(r.maxP),
+				title: "2-я цена",
+				dataIndex: "second_price",
+				key: "second_price",
+				width: 118,
+				align: "right",
+				sorter: (a, b) => (a.second_price ?? 0) - (b.second_price ?? 0),
+				render: (v) => money(v),
 			},
-		],
-		[tableView],
-	)
+			{
+				title: "Макс. скидка",
+				dataIndex: "max_discount",
+				key: "max_discount",
+				width: 118,
+				align: "right",
+				sorter: (a, b) => (a.max_discount ?? 0) - (b.max_discount ?? 0),
+				render: (v) => money(v),
+			},
+			{
+				title: "Трейд-ин",
+				dataIndex: "tradein_discount",
+				key: "tradein_discount",
+				width: 100,
+				align: "right",
+				sorter: (a, b) => (a.tradein_discount ?? 0) - (b.tradein_discount ?? 0),
+				render: (v) => money(v),
+			},
+			{
+				title: "Кредит",
+				dataIndex: "credit_discount",
+				key: "credit_discount",
+				width: 100,
+				align: "right",
+				sorter: (a, b) => (a.credit_discount ?? 0) - (b.credit_discount ?? 0),
+				render: (v) => money(v),
+			},
+			{
+				title: "Страховка",
+				dataIndex: "insurance_discount",
+				key: "insurance_discount",
+				width: 100,
+				align: "right",
+				sorter: (a, b) => (a.insurance_discount ?? 0) - (b.insurance_discount ?? 0),
+				render: (v) => money(v),
+			},
+		]
+	}, [rows, getCityLabel, token.colorError, token.colorSuccess, token.colorTextSecondary])
 
 	const exportJson = async () => {
 		if (!electron?.priceHistoryExport) return
@@ -494,7 +471,7 @@ export function PriceHistory() {
 
 	const importProps = {
 		beforeUpload: (file) => {
-			;(async () => {
+			; (async () => {
 				try {
 					const text = await file.text()
 					const data = JSON.parse(text)
@@ -516,88 +493,15 @@ export function PriceHistory() {
 		showUploadList: false,
 	}
 
-	const chartTitleText =
-		chartMetric === "count"
-			? chartLineMode === "overall"
-				? "Число строк по дням (вся выборка)"
-				: chartLineMode === "dealer"
-					? "Число строк по дням — топ дилеров в выборке"
-					: "Число строк по дням — топ брендов в выборке"
-			: chartLineMode === "overall"
-				? "Минимальная цена по дню (вся выборка)"
-				: chartLineMode === "dealer"
-					? "Мин. цена по дню и дилеру (топ-10 по числу строк)"
-					: "Мин. цена по дню и бренду (топ-10 по числу строк)"
-
-	const chartTooltip = ({ active, payload, label }) => {
-		if (!active || !payload?.length) return null
-		return (
-			<div
-				style={{
-					background: token.colorBgElevated,
-					border: `1px solid ${token.colorBorderSecondary}`,
-					borderRadius: token.borderRadius,
-					padding: "10px 12px",
-					fontSize: 12,
-					boxShadow: token.boxShadowSecondary,
-					color: token.colorText,
-				}}
-			>
-				<div style={{ marginBottom: 4 }}>
-					<Text strong>Дата: {label}</Text>
-				</div>
-				{payload.map((p) => {
-					const s = chartPack.series.find((x) => x.key === p.dataKey)
-					const name = s?.label || String(p.dataKey)
-					const v = p.value
-					const formatted =
-						chartMetric === "count"
-							? v != null
-								? String(v)
-								: "—"
-							: v != null
-								? `${Number(v).toLocaleString("ru-RU")} ₽`
-								: "—"
-					const lineColor = s?.color || p.color
-					return (
-						<div key={String(p.dataKey)} style={{ marginTop: 2 }}>
-							<span style={{ color: lineColor }}>{name}: </span>
-							{formatted}
-						</div>
-					)
-				})}
-			</div>
-		)
-	}
-
 	const overviewToolbar = (
 		<div className="ms-price-history-toolbar">
-			<div className="ms-price-history-toolbar__left">
-				<Text type="secondary">Вид</Text>
-				<Segmented
-					size="small"
-					value={tableView}
-					onChange={setTableView}
-					options={[
-						{ label: "Плоский список", value: "flat" },
-						{ label: "По дилерам", value: "dealer" },
-						{ label: "По бренду", value: "brand" },
-					]}
-				/>
-				<Text type="secondary">График</Text>
-				<Segmented
-					size="small"
-					value={chartMetric}
-					onChange={setChartMetric}
-					options={[
-						{ label: "Цены", value: "price" },
-						{ label: "Количество", value: "count" },
-					]}
-				/>
-			</div>
+			<Text type="secondary" className="ms-ph-toolbar-hint">
+				Фильтры — в иконках в заголовках колонок; поиск ниже фильтрует текущий список по
+				тексту.
+			</Text>
 			<Input.Search
 				allowClear
-				placeholder="Поиск по таблице и графику"
+				placeholder="Поиск по строке"
 				className="ms-price-history-toolbar__search"
 				value={tableSearch}
 				onChange={(e) => setTableSearch(e.target.value)}
@@ -605,87 +509,7 @@ export function PriceHistory() {
 		</div>
 	)
 
-	const chartBlock =
-		chartPack.data.length > 0 ? (
-			chartMetric === "count" ? (
-				<div className="ms-chart-surface ms-chart-surface--compact">
-					<ResponsiveContainer width="100%" height={280}>
-						<BarChart data={chartPack.data}>
-							<CartesianGrid
-								strokeDasharray="3 3"
-								stroke={token.colorBorderSecondary}
-								vertical={false}
-								opacity={0.5}
-							/>
-							<XAxis
-								dataKey="date"
-								tick={{ fontSize: 11, fill: token.colorTextTertiary }}
-								stroke={token.colorBorderSecondary}
-							/>
-							<YAxis
-								tick={{ fontSize: 11, fill: token.colorTextTertiary }}
-								stroke={token.colorBorderSecondary}
-							/>
-							<RechartsTooltip content={chartTooltip} />
-							<Legend wrapperStyle={{ fontSize: 12 }} />
-							{chartPack.series.map((s) => (
-								<Bar
-									key={s.key}
-									dataKey={s.key}
-									name={s.label}
-									fill={s.color}
-									radius={[3, 3, 0, 0]}
-									maxBarSize={48}
-								/>
-							))}
-						</BarChart>
-					</ResponsiveContainer>
-				</div>
-			) : (
-				<div className="ms-chart-surface ms-chart-surface--compact">
-					<ResponsiveContainer width="100%" height={280}>
-						<LineChart data={chartPack.data}>
-							<CartesianGrid
-								strokeDasharray="3 3"
-								stroke={token.colorBorderSecondary}
-								opacity={0.5}
-							/>
-							<XAxis
-								dataKey="date"
-								tick={{ fontSize: 11, fill: token.colorTextTertiary }}
-								stroke={token.colorBorderSecondary}
-							/>
-							<YAxis
-								tick={{ fontSize: 11, fill: token.colorTextTertiary }}
-								stroke={token.colorBorderSecondary}
-								tickFormatter={(v) =>
-									v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v
-								}
-							/>
-							<RechartsTooltip content={chartTooltip} />
-							<Legend wrapperStyle={{ fontSize: 12 }} />
-							{chartPack.series.map((s) => (
-								<Line
-									key={s.key}
-									type="monotone"
-									dataKey={s.key}
-									name={s.label}
-									stroke={s.color}
-									strokeWidth={2}
-									dot={{ r: 2.5, strokeWidth: 1 }}
-									activeDot={{ r: 4 }}
-									connectNulls
-								/>
-							))}
-						</LineChart>
-					</ResponsiveContainer>
-				</div>
-			)
-		) : (
-			<div className="ms-chart-surface ms-chart-surface--compact">
-				<Text type="secondary">Нет данных для графика</Text>
-			</div>
-		)
+	const tableScroll = { x: "max-content" }
 
 	return (
 		<div className="ms-price-history-page">
@@ -694,10 +518,9 @@ export function PriceHistory() {
 					История цен
 				</Title>
 				<Paragraph type="secondary" style={{ marginBottom: 0 }}>
-					Данные подгружаются автоматически при смене периода, города, брендов, моделей
-					или дилеров. Таблица и график используют одну и ту же выборку; колонка
-					«Изм.» — изменение цены той же позиции относительно предыдущего запуска в
-					истории.
+					Данные накапливаются после каждого завершённого парсинга. Сначала задайте
+					период и город — так сводки и графики останутся в одном регионе. Экспорт и
+					импорт JSON удобны для обмена между коллегами.
 				</Paragraph>
 			</div>
 
@@ -787,51 +610,26 @@ export function PriceHistory() {
 				</Row>
 			</Card>
 
-			<div className="ms-price-history-split">
-				<Card size="small" className="ms-price-history-panel" title="Таблица">
-					{overviewToolbar}
-					{tableView === "flat" ? (
-						<Table
-							className="ms-table-polished ms-price-history-table"
-							size="small"
-							tableLayout="fixed"
-							rowKey={(r) => `${r.id ?? r.run_id}-${stableOfferKey(r)}`}
-							columns={tableColumns}
-							dataSource={filteredHistoryRows}
-							loading={loading}
-							pagination={{ pageSize: 15, showSizeChanger: true }}
-						/>
-					) : (
-						<Table
-							className="ms-table-polished ms-price-history-table"
-							size="small"
-							tableLayout="fixed"
-							rowKey="key"
-							columns={groupParentColumns}
-							dataSource={groupedHistoryParents || []}
-							pagination={{ pageSize: 12, showSizeChanger: true }}
-							expandable={{
-								expandedRowRender: (rec) => (
-									<Table
-										className="ms-table-polished ms-price-history-table"
-										size="small"
-										tableLayout="fixed"
-										rowKey={(r) =>
-											`${r.id ?? r.run_id}-${stableOfferKey(r)}`
-										}
-										columns={tableColumns}
-										dataSource={rec.nestedRows}
-										pagination={false}
-									/>
-								),
-							}}
-						/>
-					)}
-				</Card>
-				<Card size="small" className="ms-price-history-panel" title="График">
-					{chartBlock}
-				</Card>
-			</div>
+			<Card size="small" className="ms-price-history-panel ms-price-history-table-card">
+				{overviewToolbar}
+				<div className="ms-ph-table-scroll">
+					<Table
+						className="ms-table-polished ms-price-history-table"
+						size="small"
+						tableLayout="auto"
+						scroll={tableScroll}
+						rowKey={(r) => `${r.id ?? r.run_id}-${stableOfferKey(r)}`}
+						columns={tableColumns}
+						dataSource={filteredHistoryRows}
+						loading={loading}
+						pagination={{
+							pageSize: 25,
+							showSizeChanger: true,
+							pageSizeOptions: [15, 25, 50, 100],
+						}}
+					/>
+				</div>
+			</Card>
 
 			<Card size="small" title="Инструменты" className="ms-price-history-tools">
 				<Space wrap>

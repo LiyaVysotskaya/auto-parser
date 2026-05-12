@@ -290,7 +290,7 @@ body,
 	padding: 10px 12px 8px;
 }
 
-/* История цен: фильтры, сплит таблица/график */
+/* История цен: фильтры и широкая таблица */
 .ms-price-history-page .ms-price-history-filters .ms-ph-range {
 	width: 100%;
 }
@@ -310,51 +310,90 @@ body,
 	min-height: 32px;
 }
 
-.ms-price-history-split {
-	display: grid;
-	grid-template-columns: 1fr;
-	gap: 16px;
+.ms-price-history-table-card {
+	margin-top: 16px;
 }
 
-@media (min-width: 1100px) {
-	.ms-price-history-split {
-		grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-		align-items: start;
-	}
+.ms-price-history-table-card .ant-card-body {
+	max-width: 100%;
+	min-width: 0;
 }
 
 .ms-price-history-panel .ant-card-body {
 	padding-top: 12px;
 }
 
+/* Горизонтальная прокрутка вместо «уезжания» широкой таблицы за экран */
+.ms-ph-table-scroll {
+	width: 100%;
+	max-width: 100%;
+	min-width: 0;
+	overflow-x: auto;
+	overflow-y: visible;
+	-webkit-overflow-scrolling: touch;
+}
+
+/* Заголовок колонки изменения цены */
+.ms-ph-delta-th {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 700;
+	font-size: 12px;
+	line-height: 1.25;
+	color: var(--ant-color-success);
+	letter-spacing: 0.01em;
+}
+
+/* Колонка «Изм. цены» — акцент */
+.ms-price-history-table th.ms-ph-delta-col,
+.ms-price-history-table td.ms-ph-delta-col {
+	background: var(--ant-color-success-bg, rgba(82, 196, 26, 0.12)) !important;
+	border-inline-start: 3px solid var(--ant-color-success, #52c41a);
+}
+
+.ms-price-history-table .ant-table-tbody > tr:hover > td.ms-ph-delta-col {
+	background: var(
+		--ant-color-success-bg-hover,
+		var(--ant-color-success-bg, rgba(82, 196, 26, 0.18))
+	) !important;
+}
+
+.ms-price-history-table .ant-table-thead > tr > th.ms-ph-delta-col {
+	border-inline-start: 3px solid var(--ant-color-success, #52c41a);
+}
+
+/* «Чип» внутри ячейки */
+.ms-ph-delta-cell--pill {
+	display: inline-block;
+	max-width: 100%;
+	padding: 3px 10px 4px;
+	border-radius: 999px;
+	vertical-align: middle;
+	background: var(--ant-color-bg-elevated);
+	border: 1px solid var(--ant-color-border-secondary);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
 .ms-price-history-toolbar {
 	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 12px 16px;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 10px;
 	margin-bottom: 12px;
 }
 
-.ms-price-history-toolbar__left {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 8px 12px;
+.ms-ph-toolbar-hint {
+	font-size: 12px;
+	line-height: 1.45;
+	max-width: 720px;
 }
 
 .ms-price-history-toolbar__search {
-	flex: 1 1 200px;
-	min-width: 180px;
-	max-width: 360px;
-}
-
-.ms-price-history-chart-hd {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: flex-start;
-	justify-content: space-between;
-	gap: 12px;
-	margin-bottom: 10px;
+	flex: 1 1 auto;
+	min-width: 0;
+	width: 100%;
+	max-width: 100%;
 }
 
 .ms-price-history-tools {
@@ -362,20 +401,26 @@ body,
 }
 
 .ms-price-history-table .ant-table {
-	table-layout: fixed;
+	table-layout: auto;
+}
+
+.ms-price-history-table.ant-table-wrapper .ant-table-tbody > tr > td {
+	overflow: hidden;
 }
 
 .ms-price-history-table .ms-ph-delta-col {
-	max-width: 140px;
-	overflow: hidden;
-	vertical-align: top;
+	max-width: 220px;
+	min-width: 140px;
+	vertical-align: middle;
 }
 
 .ms-price-history-table .ms-ph-delta-cell {
+	display: block;
 	text-align: right;
-	max-width: 100%;
-	overflow-wrap: anywhere;
-	word-break: break-word;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 /* —— Макет «кокпит» (auto_ru_full_app.html) —— */

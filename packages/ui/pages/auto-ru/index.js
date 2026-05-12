@@ -755,14 +755,6 @@ export function AutoRu() {
 					)}
 				</div>
 			</Card>
-
-			<Paragraph
-				type="secondary"
-				style={{ marginBottom: 0, fontSize: 12 }}
-			>
-				Настройки городов и брендов — в разделе «Настройки». Конкуренты и
-				сравнение цен — отдельные пункты меню.
-			</Paragraph>
 		</Space>
 	)
 }

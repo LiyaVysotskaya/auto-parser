@@ -13,6 +13,35 @@
 	--ms-acc2: #185fa5;
 }
 
+/* Тонкий нейтральный скроллбар (Firefox + Chromium / Electron) */
+.ms-scrollbar {
+	scrollbar-gutter: stable;
+	scrollbar-width: thin;
+	scrollbar-color: color-mix(in srgb, var(--ant-color-text) 24%, transparent) transparent;
+}
+
+.ms-scrollbar::-webkit-scrollbar {
+	width: 5px;
+	height: 5px;
+}
+
+.ms-scrollbar::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.ms-scrollbar::-webkit-scrollbar-thumb {
+	background-color: color-mix(in srgb, var(--ant-color-text) 22%, transparent);
+	border-radius: 100px;
+}
+
+.ms-scrollbar:hover::-webkit-scrollbar-thumb {
+	background-color: color-mix(in srgb, var(--ant-color-text) 38%, transparent);
+}
+
+.ms-scrollbar::-webkit-scrollbar-thumb:active {
+	background-color: color-mix(in srgb, var(--ant-color-text) 50%, transparent);
+}
+
 html,
 body,
 #root {
@@ -157,27 +186,123 @@ body,
 	padding: 16px 18px;
 }
 
-/* Теги брендов — крупнее и контрастнее */
-.ms-brand-tags {
+/* Список брендов / моделей в карточке настроек парсинга */
+.ms-parse-brand-roster {
+	max-height: min(52vh, 280px);
+	overflow: auto;
+	margin: 0 -4px;
+	padding: 0 6px 0 4px;
+}
+
+.ms-parse-brand-roster__empty {
+	display: block;
+	font-size: 12px;
+	padding: 4px 0;
+}
+
+.ms-parse-brand-row {
+	display: grid;
+	grid-template-columns: minmax(72px, 32%) minmax(0, 1fr);
+	gap: 10px 12px;
+	align-items: baseline;
+	padding: 8px 10px;
+	margin-bottom: 4px;
+	border-radius: 10px;
+	border: 1px solid var(--ant-color-border-secondary);
+	background: var(--ant-color-fill-quaternary, rgba(0, 0, 0, 0.02));
+	transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ms-parse-brand-row:last-child {
+	margin-bottom: 0;
+}
+
+.ms-parse-brand-row--selected {
+	border-color: rgba(37, 99, 235, 0.35);
+	background: rgba(55, 138, 221, 0.06);
+}
+
+.ms-parse-brand-row--off {
+	opacity: 0.72;
+}
+
+.ms-parse-brand-row__brand {
 	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	margin-top: 10px;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
 }
 
-.ms-brand-tag {
-	font-size: 13px !important;
-	line-height: 1.4 !important;
-	padding: 6px 12px !important;
-	margin: 0 !important;
-	border-radius: 999px !important;
-	font-weight: 500;
-	border: 1px solid var(--ant-color-border-secondary) !important;
+.ms-parse-brand-row__name {
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1.3;
+	color: var(--ant-color-text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
-.ms-brand-tag.ant-tag-blue,
-.ms-brand-tag[class*="color-processing"] {
-	border-color: rgba(37, 99, 235, 0.35) !important;
+.ms-parse-brand-row__dot {
+	flex-shrink: 0;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--ant-color-primary);
+}
+
+.ms-parse-brand-row__models {
+	font-size: 12px;
+	line-height: 1.45;
+	color: var(--ant-color-text-secondary);
+	min-width: 0;
+	word-break: break-word;
+}
+
+.ms-parse-brand-row__models-text {
+	color: var(--ant-color-text-secondary);
+}
+
+.ms-parse-brand-row__hint {
+	font-size: 12px !important;
+}
+
+.ms-parse-brand-more-btn.ant-btn {
+	padding: 0;
+	height: auto;
+	font-size: 12px;
+	line-height: inherit;
+	vertical-align: baseline;
+}
+
+.ms-parse-brand-popover .ant-popover-inner {
+	max-width: min(92vw, 340px);
+}
+
+.ms-parse-brand-popover-list {
+	list-style: none;
+	margin: 0;
+	padding: 0 4px 0 0;
+	max-height: 240px;
+	overflow-y: auto;
+}
+
+.ms-parse-brand-popover-list__item {
+	padding: 5px 2px;
+	font-size: 13px;
+	line-height: 1.4;
+	border-bottom: 1px solid var(--ant-color-border-secondary);
+}
+
+.ms-parse-brand-popover-list__item:last-child {
+	border-bottom: none;
+}
+
+@media (max-width: 576px) {
+	.ms-parse-brand-row {
+		grid-template-columns: 1fr;
+		gap: 4px;
+	}
 }
 
 /* Карточки конфигурации на главной */
@@ -493,10 +618,6 @@ body,
 	min-height: 100%;
 }
 
-.ms-cockpit-g3--embedded {
-	margin-bottom: 0;
-}
-
 .ms-fav-dealer {
 	margin-top: 4px;
 	font-size: 12px;
@@ -527,6 +648,91 @@ body,
 	.ms-cockpit-g3 {
 		grid-template-columns: 1fr;
 	}
+}
+
+/* Единый формат блока «Настройки парсинга» на главной Auto.ru */
+.ms-parse-config-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr) minmax(0, 1fr);
+	gap: 12px;
+	align-items: stretch;
+}
+
+@media (max-width: 992px) {
+	.ms-parse-config-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+.ms-parse-config-tile {
+	border-radius: var(--ant-border-radius-lg, 12px);
+	padding: 14px 16px;
+	border: 1px solid var(--ant-color-border-secondary);
+	background: var(--ant-color-bg-container);
+	box-shadow: var(--ant-box-shadow-tertiary, none);
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	min-height: 0;
+}
+
+.ms-parse-config-tile__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.ms-parse-config-tile__title {
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--ant-color-text-tertiary);
+}
+
+.ms-parse-config-tile__meta {
+	font-size: 12px;
+	line-height: 1.45;
+	color: var(--ant-color-text-secondary);
+}
+
+.ms-parse-config-tile__body {
+	flex: 1;
+	min-height: 0;
+}
+
+.ms-parse-config-tile__value {
+	font-size: 20px;
+	font-weight: 500;
+	line-height: 1.15;
+	font-variant-numeric: tabular-nums;
+	color: var(--ant-color-text);
+}
+
+.ms-parse-config-tile__sub {
+	font-size: 12px;
+	line-height: 1.45;
+	color: var(--ant-color-text-secondary);
+}
+
+.ms-parse-config-footer {
+	margin-top: 14px;
+	padding-top: 14px;
+	border-top: 1px solid var(--ant-color-border-secondary);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 12px;
+}
+
+.ms-parse-config-footer__main {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
 }
 
 .ms-card-hd {

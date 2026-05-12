@@ -22,7 +22,6 @@ import {
 	Segmented,
 	Space,
 	Statistic,
-	Tag,
 	Typography,
 	message,
 } from "antd"
@@ -33,6 +32,7 @@ import * as XLSX from "xlsx"
 import { computeSummary, flattenReport } from "../../analytics.js"
 import { electron } from "../../electron.js"
 import { REF } from "../../theme-tokens.js"
+import { ParseBrandRoster } from "./ParseBrandRoster.jsx"
 import {
 	CockpitBrandDonut,
 	CockpitDonutLegend,
@@ -63,6 +63,13 @@ function logLevelClass(level) {
 		default:
 			return "ms-log-line--info"
 	}
+}
+
+function medianFromPrices(prices) {
+	if (!prices?.length) return null
+	const s = [...prices].sort((a, b) => a - b)
+	const mid = Math.floor(s.length / 2)
+	return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2
 }
 
 function formatDuration(ms) {
@@ -223,27 +230,27 @@ export function AutoRu() {
 					if (r.price == null) continue
 					const t = String(r.run_started || "")
 					if (!t) continue
-					const cur = byRun.get(t)
-					if (cur == null || r.price < cur.price) {
-						byRun.set(t, {
-							price: r.price,
-							brand: r.brand,
-							model: r.model,
-							dealer: r.dealer,
-							city: r.city,
-						})
-					}
+					if (!byRun.has(t)) byRun.set(t, [])
+					byRun.get(t).push(r)
 				}
 				const pts = [...byRun.entries()]
 					.sort((a, b) => a[0].localeCompare(b[0]))
-					.map(([started, m]) => ({
-						label: dateFns.format(new Date(started), "dd MM yyyy"),
-						value: Math.round(m.price / 1000),
-						brand: m.brand,
-						model: m.model,
-						dealer: m.dealer,
-						city: m.city,
-					}))
+					.map(([started, list]) => {
+						const prices = list
+							.map((x) => x.price)
+							.filter((x) => Number.isFinite(x))
+						const med = medianFromPrices(prices)
+						const minR = list.reduce((a, b) => (a.price <= b.price ? a : b))
+						return {
+							label: dateFns.format(new Date(started), "dd MM yyyy"),
+							value: Math.round(med / 1000),
+							minValue: Math.round(minR.price / 1000),
+							minCarBrand: minR.brand,
+							minCarModel: minR.model,
+							minCarDealer: minR.dealer,
+							minCarCity: minR.city,
+						}
+					})
 				setLineSeries(pts)
 			}
 
@@ -292,18 +299,27 @@ export function AutoRu() {
 	const lineLastContext = useMemo(() => {
 		if (!lineSeries.length) return null
 		const p = lineSeries[lineSeries.length - 1]
-		const car = [p.brand, p.model].filter(Boolean).join(" ").trim()
-		const dealer = p.dealer && String(p.dealer).trim()
+		const minCar = [p.minCarBrand, p.minCarModel]
+			.filter(Boolean)
+			.join(" ")
+			.trim()
+		const dealer = p.minCarDealer && String(p.minCarDealer).trim()
 		const city =
-			p.city != null && String(p.city).trim() && String(p.city).trim() !== "—"
-				? getCityLabel(String(p.city).trim())
+			p.minCarCity != null &&
+			String(p.minCarCity).trim() &&
+			String(p.minCarCity).trim() !== "—"
+				? getCityLabel(String(p.minCarCity).trim())
 				: ""
-		if (!car && !dealer && !city) return null
-		const parts = []
-		if (car) parts.push(car)
-		if (dealer) parts.push(dealer)
-		if (city) parts.push(city)
-		return `Последняя точка (${p.label}): ${parts.join(" · ")}`
+		const med = p.value != null ? `медиана ${p.value} тыс ₽` : ""
+		const mn = p.minValue != null ? `мин. ${p.minValue} тыс ₽` : ""
+		const head = [med, mn].filter(Boolean).join(", ")
+		if (!head && !minCar && !dealer && !city) return null
+		const tailParts = []
+		if (minCar) tailParts.push(`самая дешёвая позиция: ${minCar}`)
+		if (dealer) tailParts.push(dealer)
+		if (city) tailParts.push(city)
+		const tail = tailParts.length ? ` · ${tailParts.join(" · ")}` : ""
+		return `Последний запуск (${p.label}): ${head}${tail}`
 	}, [getCityLabel, lineSeries])
 
 	return (
@@ -436,71 +452,56 @@ export function AutoRu() {
 				size="small"
 				title="Настройки парсинга и отчёт"
 			>
-				<div className="ms-cockpit-g3 ms-cockpit-g3--embedded">
-					<Card
-						className="ms-dash-card"
-						size="small"
-						title="Бренды"
-						extra={
+				<div className="ms-parse-config-grid">
+					<div className="ms-parse-config-tile">
+						<div className="ms-parse-config-tile__head">
+							<span className="ms-parse-config-tile__title">Бренды</span>
 							<Button
 								type="link"
 								size="small"
+								style={{ padding: 0, height: "auto", fontSize: 12 }}
 								onClick={() => navigate("/auto-ru/settings")}
 							>
 								Изменить
 							</Button>
-						}
-					>
-						<Text
-							type="secondary"
-							style={{ fontSize: 12 }}
-						>
-							Выбрано {selectedCount} из {totalBrands}
-						</Text>
-						<div className="ms-brand-tags">
-							{(settings.brands || []).slice(0, 14).map((b) => (
-								<Tag
-									key={b.id}
-									className="ms-brand-tag"
-									color={b.selected ? "blue" : "default"}
-								>
-									{b.name}
-								</Tag>
-							))}
 						</div>
-					</Card>
-					<Card
-						className="ms-dash-card"
-						size="small"
-						title="Годы"
-					>
-						<Statistic
-							title="Диапазон"
-							value={yearsText}
-						/>
-					</Card>
-					<Card
-						className="ms-dash-card"
-						size="small"
-						title="Каталог"
-					>
-						<Text style={{ fontSize: 12 }}>{cityDisplay.name}</Text>
-						<Text
-							type="secondary"
-							style={{ fontSize: 11, display: "block" }}
-						>
-							{parseCitiesLabel}
-						</Text>
-					</Card>
+						<div className="ms-parse-config-tile__meta">
+							Выбрано {selectedCount} из {totalBrands}
+						</div>
+						<div className="ms-parse-config-tile__body">
+							<ParseBrandRoster brands={settings.brands || []} />
+						</div>
+					</div>
+					<div className="ms-parse-config-tile">
+						<div className="ms-parse-config-tile__head">
+							<span className="ms-parse-config-tile__title">Годы</span>
+						</div>
+						<div className="ms-parse-config-tile__meta">Диапазон выпуска</div>
+						<div className="ms-parse-config-tile__value">{yearsText}</div>
+					</div>
+					<div className="ms-parse-config-tile">
+						<div className="ms-parse-config-tile__head">
+							<span className="ms-parse-config-tile__title">Каталог</span>
+						</div>
+						<div className="ms-parse-config-tile__meta">Город каталога</div>
+						<div className="ms-parse-config-tile__value">
+							{cityDisplay.name}
+						</div>
+					</div>
 				</div>
-				{reportRows > 0 && !isPending ? (
-					<>
-						<Divider style={{ margin: "12px 0" }} />
-						<Space
-							style={{ width: "100%", justifyContent: "space-between" }}
-							wrap
-						>
-							<Text strong>Отчёт в памяти</Text>
+				<div className="ms-parse-config-footer">
+					{reportRows > 0 && !isPending ? (
+						<>
+							<div className="ms-parse-config-footer__main">
+								<Text strong>Отчёт в памяти</Text>
+								<Text
+									type="secondary"
+									style={{ fontSize: 12 }}
+								>
+									{reportSheets} бренда · {reportRows.toLocaleString("ru-RU")}{" "}
+									строк
+								</Text>
+							</div>
 							<Button
 								type="primary"
 								icon={<BarChartOutlined />}
@@ -508,17 +509,17 @@ export function AutoRu() {
 							>
 								Аналитика
 							</Button>
-						</Space>
-					</>
-				) : (
-					<Text
-						type="secondary"
-						style={{ fontSize: 12, display: "block", marginTop: 8 }}
-					>
-						Нет загруженного отчёта — после парсинга здесь появится кнопка
-						аналитики.
-					</Text>
-				)}
+						</>
+					) : (
+						<Text
+							type="secondary"
+							style={{ fontSize: 12 }}
+						>
+							Нет загруженного отчёта — после парсинга здесь появится кнопка
+							аналитики.
+						</Text>
+					)}
+				</div>
 			</Card>
 
 			<div className="ms-launch-kpi">
@@ -560,7 +561,7 @@ export function AutoRu() {
 					size="small"
 					title={
 						<div>
-							<div>Динамика минимальных цен</div>
+							<div>Динамика цен по запускам</div>
 							<Text
 								type="secondary"
 								style={{
@@ -571,9 +572,8 @@ export function AutoRu() {
 									lineHeight: 1.45,
 								}}
 							>
-								По каждому запуску — минимальная цена среди всех предложений в
-								истории; точки могут относиться к разным моделям. Подсказка при
-								наведении на точку.
+								Сплошная линия — медиана цены по всем строкам отчёта в запуске.
+								Пунктир — минимум в том же запуске.
 							</Text>
 						</div>
 					}

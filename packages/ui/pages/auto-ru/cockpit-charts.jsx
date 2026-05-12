@@ -18,11 +18,14 @@ import { theme } from "antd"
 
 import { REF } from "../../theme-tokens.js"
 
-function minPriceTooltip({ active, payload, label }, token, getCityLabel) {
+function runPriceTrendTooltip({ active, payload, label }, token, getCityLabel) {
 	if (!active || !payload?.length) return null
 	const p = payload[0]?.payload || {}
-	const title = [p.brand, p.model].filter(Boolean).join(" ").trim()
-	const loc = [p.dealer, p.city && p.city !== "—" ? getCityLabel(p.city) : null]
+	const minTitle = [p.minCarBrand, p.minCarModel].filter(Boolean).join(" ").trim()
+	const minLoc = [
+		p.minCarDealer,
+		p.minCarCity && p.minCarCity !== "—" ? getCityLabel(p.minCarCity) : null,
+	]
 		.filter(Boolean)
 		.join(" · ")
 	return (
@@ -33,35 +36,45 @@ function minPriceTooltip({ active, payload, label }, token, getCityLabel) {
 				borderRadius: 6,
 				fontSize: 12,
 				padding: "8px 10px",
-				maxWidth: 280,
+				maxWidth: 300,
 			}}
 		>
 			<div style={{ color: token.colorTextTertiary, fontSize: 11, marginBottom: 4 }}>
 				{label}
 			</div>
-			<div style={{ fontWeight: 600, marginBottom: 4 }}>
-				Мин. цена: {p.value != null ? `${p.value} тыс ₽` : "—"}
+			<div style={{ fontWeight: 600, marginBottom: 2 }}>
+				Медиана: {p.value != null ? `${p.value} тыс ₽` : "—"}
 			</div>
-			{title ? (
-				<div style={{ color: token.colorText, marginBottom: 2 }}>{title}</div>
+			<div style={{ color: token.colorTextSecondary, fontSize: 11, marginBottom: 6 }}>
+				По всем строкам отчёта в этом запуске (типичный уровень цен).
+			</div>
+			<div style={{ fontWeight: 500, marginBottom: 2 }}>
+				Минимум: {p.minValue != null ? `${p.minValue} тыс ₽` : "—"}
+			</div>
+			{minTitle ? (
+				<div style={{ color: token.colorText, marginBottom: 2, fontSize: 11 }}>{minTitle}</div>
 			) : null}
-			{loc ? (
-				<div style={{ color: token.colorTextSecondary, fontSize: 11 }}>{loc}</div>
-			) : (
+			{minLoc ? (
+				<div style={{ color: token.colorTextSecondary, fontSize: 11 }}>{minLoc}</div>
+			) : minTitle ? (
 				<div style={{ color: token.colorTextTertiary, fontSize: 11 }}>
 					Нет привязки к дилеру в записи истории
 				</div>
-			)}
+			) : null}
 		</div>
 	)
 }
 
-/** Минимальная цена по запускам, тыс. ₽ (ось Y как в HTML-прототипе). */
+/**
+ * По запускам: медиана цены по всем строкам (тыс. ₽) и пунктиром — минимум
+ * (самая дешёвая позиция в том же запуске).
+ */
 export function CockpitMinPriceLine({ data, height = 140, getCityLabel = (x) => x }) {
 	const { token } = theme.useToken()
 	const stroke = REF.acc
 	const fill = "rgba(55,138,221,0.12)"
 	const grid = token.colorBorderSecondary
+	const minStroke = token.colorTextTertiary
 
 	if (!data?.length) {
 		return (
@@ -97,8 +110,17 @@ export function CockpitMinPriceLine({ data, height = 140, getCityLabel = (x) => 
 						tickFormatter={(v) => `${v}`}
 						width={36}
 					/>
-					<Tooltip content={(props) => minPriceTooltip(props, token, getCityLabel)} />
+					<Tooltip content={(props) => runPriceTrendTooltip(props, token, getCityLabel)} />
 					<Area type="monotone" dataKey="value" stroke="none" fill={fill} fillOpacity={1} />
+					<Line
+						type="monotone"
+						dataKey="minValue"
+						stroke={minStroke}
+						strokeWidth={1}
+						strokeDasharray="4 3"
+						dot={false}
+						activeDot={{ r: 3, fill: minStroke }}
+					/>
 					<Line
 						type="monotone"
 						dataKey="value"

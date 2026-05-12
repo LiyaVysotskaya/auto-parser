@@ -7,7 +7,7 @@ const VISIBLE_MODELS = 3
 
 function ModelsPopoverList({ names }) {
 	return (
-		<ul className="ms-parse-brand-popover-list ms-scrollbar">
+		<ul className="ms-parse-brand-popover-list">
 			{names.map((n, i) => (
 				<li
 					key={`${n}-${i}`}
@@ -84,7 +84,7 @@ export function ParseBrandRoster({ brands = [], maxBrands = 14 }) {
 	}
 
 	return (
-		<div className="ms-parse-brand-roster ms-scrollbar">
+		<div className="ms-parse-brand-roster">
 			{list.map((b) => {
 				const models = b.models || []
 				const selected = Boolean(b.selected)

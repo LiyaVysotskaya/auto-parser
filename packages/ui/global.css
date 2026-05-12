@@ -1,5 +1,3 @@
-/* Глобальная полировка UI: сетка, карточки, таблицы, боковая панель */
-
 :root {
 	--ms-font-sans: system-ui, -apple-system, "Segoe UI", roboto, "Helvetica Neue",
 		arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
@@ -13,32 +11,34 @@
 	--ms-acc2: #185fa5;
 }
 
-/* Тонкий нейтральный скроллбар (Firefox + Chromium / Electron) */
-.ms-scrollbar {
+html {
 	scrollbar-gutter: stable;
+}
+
+* {
 	scrollbar-width: thin;
 	scrollbar-color: color-mix(in srgb, var(--ant-color-text) 24%, transparent) transparent;
 }
 
-.ms-scrollbar::-webkit-scrollbar {
+*::-webkit-scrollbar {
 	width: 5px;
 	height: 5px;
 }
 
-.ms-scrollbar::-webkit-scrollbar-track {
+*::-webkit-scrollbar-track {
 	background: transparent;
 }
 
-.ms-scrollbar::-webkit-scrollbar-thumb {
+*::-webkit-scrollbar-thumb {
 	background-color: color-mix(in srgb, var(--ant-color-text) 22%, transparent);
 	border-radius: 100px;
 }
 
-.ms-scrollbar:hover::-webkit-scrollbar-thumb {
+*:hover::-webkit-scrollbar-thumb {
 	background-color: color-mix(in srgb, var(--ant-color-text) 38%, transparent);
 }
 
-.ms-scrollbar::-webkit-scrollbar-thumb:active {
+*::-webkit-scrollbar-thumb:active {
 	background-color: color-mix(in srgb, var(--ant-color-text) 50%, transparent);
 }
 
